@@ -59,6 +59,21 @@
   }
 }
 
+/* Onboarding bubble entrance animation — gated by reduced-motion preference.
+   The motion-safe: Tailwind prefix references this keyframe. */
+@media (prefers-reduced-motion: no-preference) {
+  @keyframes onboardingIn {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
 @layer components {
   /* Display tier — weight 500 + negative tracking, responsive stair-step */
   .display-xxl {
