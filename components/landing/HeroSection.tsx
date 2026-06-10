@@ -97,7 +97,7 @@ export default function HeroSection() {
               </Button>
               <a
                 href="#funcionalidades"
-                className="text-[14px] font-medium text-ink-mute hover:text-ink hover:underline underline-offset-4 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                className="text-[14px] font-medium text-ink-mute hover:text-ink hover:underline underline-offset-4 motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 Ver cómo funciona
               </a>

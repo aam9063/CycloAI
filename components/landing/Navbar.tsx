@@ -45,7 +45,7 @@ export default function Navbar() {
   ];
 
   const scrollClass = scrolled
-    ? "bg-white/80 backdrop-blur-md border-b border-hairline"
+    ? "bg-canvas/80 backdrop-blur-md border-b border-hairline"
     : "bg-transparent border-b border-transparent";
 
   return (
@@ -70,7 +70,7 @@ export default function Navbar() {
               <a
                 key={link.href}
                 href={link.href}
-                className="text-[14px] text-ink-mute hover:text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                className="text-[14px] text-ink-mute hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 {link.label}
               </a>
@@ -82,7 +82,7 @@ export default function Navbar() {
             <Button variant="ghost" href="/login">
               Iniciar sesión
             </Button>
-            <Button variant="primary" href="/login">
+            <Button variant="outline" href="/login">
               Empezar gratis
             </Button>
           </div>
@@ -116,7 +116,7 @@ export default function Navbar() {
             <a
               key={link.href}
               href={link.href}
-              className="text-[15px] text-ink py-2 hover:text-ink-mute transition-colors"
+              className="text-[15px] text-ink py-2 hover:text-ink-mute motion-safe:transition-colors"
               onClick={() => setOpen(false)}
             >
               {link.label}

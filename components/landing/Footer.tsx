@@ -33,7 +33,7 @@ export default function Footer() {
               <a
                 key={link.label}
                 href={link.href}
-                className="hover:text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                className="hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 {link.label}
               </a>
@@ -47,7 +47,7 @@ export default function Footer() {
               <a
                 key={link.label}
                 href={link.href}
-                className="hover:text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                className="hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               >
                 {link.label}
               </a>
