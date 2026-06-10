@@ -48,7 +48,7 @@ function ChatMockup() {
       {/* Faux input row */}
       <div className="bg-canvas border-t border-hairline px-4 py-3 flex items-center gap-3">
         <span className="flex-1 text-[13px] text-ink-faint">
-          Escribí tu mensaje…
+          Escribe tu mensaje…
         </span>
         <span
           aria-hidden="true"
