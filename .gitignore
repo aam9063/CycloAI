@@ -16,6 +16,14 @@
 # next.js
 /.next/
 /out/
+.agents
+.claude
+.atl
+.mcp.json
+CLAUDE.md
+DESIGN.md
+CycloAI_Informe_Completo.md
+RAG_GUIDE.md
 
 # production
 /build
