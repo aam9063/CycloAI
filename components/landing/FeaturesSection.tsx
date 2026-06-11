@@ -68,7 +68,8 @@ export default function FeaturesSection() {
           {features.map((feature) => (
             <div
               key={feature.title}
-              className="bg-canvas border border-hairline rounded-lg p-8"
+              data-reveal-item
+              className="bg-canvas border border-hairline rounded-lg p-8 motion-safe:transition-[transform,box-shadow,border-color] motion-safe:duration-200 motion-safe:ease-out hover:border-hairline-strong hover:shadow-float motion-safe:hover:-translate-y-1"
             >
               <feature.Icon
                 size={24}

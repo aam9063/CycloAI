@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import Container from "@/components/ui/Container";
 
 const productLinks = [
@@ -8,8 +9,8 @@ const productLinks = [
 ];
 
 const legalLinks = [
-  { label: "Política de privacidad", href: "#" },
-  { label: "Términos de uso", href: "#" },
+  { label: "Política de privacidad", href: "/privacidad" },
+  { label: "Términos de uso", href: "/terminos" },
   { label: "Contacto", href: "#" },
 ];
 
@@ -48,15 +49,25 @@ export default function Footer() {
           {/* Legal / Soporte column */}
           <div className="flex flex-col gap-2">
             <p className="font-medium text-ink mb-1">Legal / Soporte</p>
-            {legalLinks.map((link) => (
-              <a
-                key={link.label}
-                href={link.href}
-                className="hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                {link.label}
-              </a>
-            ))}
+            {legalLinks.map((link) =>
+              link.href.startsWith("/") ? (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  className="hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  {link.label}
+                </Link>
+              ) : (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  className="hover:text-ink motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  {link.label}
+                </a>
+              )
+            )}
           </div>
         </div>
       </Container>
