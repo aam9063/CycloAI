@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { ConversationRow } from '@/lib/ai/types';
 import ConversationListItem from './ConversationListItem';
 
@@ -51,6 +52,7 @@ export default function FloatingSidebar({ conversations }: FloatingSidebarProps)
   const hydratedRef = useRef(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   // Restore persisted state once, post-hydration. SSR cannot read sessionStorage,
   // so the first render is always `true` and the stored value is applied here —
@@ -162,7 +164,15 @@ export default function FloatingSidebar({ conversations }: FloatingSidebarProps)
       <div className="px-3 py-2.5 border-b border-hairline shrink-0">
         <Link
           href="/chat?new=1"
-          onClick={handleConvClick}
+          onClick={(e) => {
+            // Unique value per click: two consecutive "Nueva conversación" clicks
+            // must produce DIFFERENT URLs so the page key changes and React
+            // remounts ChatInterface (same ?new=1 twice would preserve the
+            // previous instance and its stale conversation state).
+            e.preventDefault();
+            router.push(`/chat?new=${Date.now()}`);
+            handleConvClick();
+          }}
           className={[
             'flex items-center justify-center gap-2',
             'w-full min-h-[40px] px-3 py-2 rounded-lg',

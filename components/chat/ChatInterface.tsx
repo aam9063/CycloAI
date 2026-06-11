@@ -97,6 +97,23 @@ export default function ChatInterface({
   const isLoading = status === 'submitted' || status === 'streaming';
   const hasMessages = messages.length > 0;
 
+  // Continue-on-cut affordance:
+  // Show when the last assistant message ended abnormally (finishReason !== 'stop')
+  // AND the user did NOT explicitly stop it.
+  // - User stop (via stop()): onAbort writes { aborted: true } — no finishReason field.
+  // - Abnormal cut (Gemini 'other', 'length', etc.): onFinish writes { aborted: true, finishReason } OR { finishReason }.
+  // Rule: affordance = finishReason is present AND finishReason !== 'stop'.
+  const lastMsg = messages.length > 0 ? messages[messages.length - 1] : null;
+  const wasCut = (() => {
+    if (status !== 'ready') return false;
+    if (!lastMsg || lastMsg.role !== 'assistant') return false;
+    const meta = lastMsg.metadata as Record<string, unknown> | undefined;
+    if (!meta) return false;
+    const fr = meta.finishReason as string | undefined;
+    // finishReason must be present and not 'stop' to show the affordance
+    return typeof fr === 'string' && fr !== 'stop';
+  })();
+
   // Detect if the assistant has started sending text (for typing indicator logic)
   const lastAssistantMessage = messages.findLast((m) => m.role === 'assistant');
   const assistantHasText =
@@ -316,6 +333,28 @@ export default function ChatInterface({
 
           {/* Typing indicator (pre-first-token) */}
           <TypingIndicator visible={showTypingIndicator} />
+
+          {/* Continue-on-cut affordance — shown when Gemini ends stream abnormally */}
+          {wasCut && !errorMessage && (
+            <div className="self-start max-w-[85%]">
+              <p className="text-[13px] text-ink-mute mb-1.5">
+                La respuesta se interrumpió.
+              </p>
+              <button
+                type="button"
+                onClick={() => handleSend('continúa')}
+                className={[
+                  'min-h-[44px] px-3 py-2 rounded-lg border border-hairline',
+                  'text-[13px] font-medium text-ink',
+                  'bg-canvas hover:bg-surface-hover',
+                  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+                  'transition-colors',
+                ].join(' ')}
+              >
+                Continuar
+              </button>
+            </div>
+          )}
 
           {/* Inline error block */}
           {errorMessage && (

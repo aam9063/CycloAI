@@ -26,9 +26,11 @@ function mapToUIMessages(rows: MessageRow[]): UIMessage[] {
 }
 
 export default async function ChatPage({ searchParams }: ChatPageProps) {
-  // BUG-2: await searchParams (Next 16 async API) and detect ?new=1
+  // BUG-2: await searchParams (Next 16 async API) and detect ?new=<unique>.
+  // The value is a per-click timestamp (see FloatingSidebar) so it doubles as
+  // a React key — consecutive "Nueva conversación" clicks remount ChatInterface.
   const { new: isNew } = await searchParams;
-  const forceNew = isNew === '1';
+  const forceNew = Boolean(isNew);
 
   const supabase = await createClient();
   const {
@@ -42,7 +44,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   // When ?new=1 is present, always render the empty/welcome state regardless of
   // existing conversations. This makes "Nueva conversación" actually work (BUG-2).
   if (forceNew) {
-    return <ChatInterface initialMessages={[]} />;
+    return <ChatInterface key={`new-${isNew}`} initialMessages={[]} />;
   }
 
   // Render-in-place: load the most-recent conversation if one exists, else welcome state.
@@ -56,6 +58,7 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
 
     return (
       <ChatInterface
+        key={latest.id}
         conversationId={latest.id}
         initialMessages={initialMessages}
       />
@@ -63,5 +66,5 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   }
 
   // No conversations yet — render welcome / empty state
-  return <ChatInterface initialMessages={[]} />;
+  return <ChatInterface key="new-empty" initialMessages={[]} />;
 }

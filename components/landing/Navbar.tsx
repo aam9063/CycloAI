@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { LuMenu, LuX } from "react-icons/lu";
 import Button from "@/components/ui/Button";
 
@@ -45,23 +46,32 @@ export default function Navbar() {
   ];
 
   const scrollClass = scrolled
-    ? "bg-canvas/80 backdrop-blur-md border-b border-hairline"
-    : "bg-transparent border-b border-transparent";
+    ? "bg-canvas/80 backdrop-blur-md border-hairline shadow-sm"
+    : "bg-canvas/60 backdrop-blur-md border-hairline/60";
 
   return (
     <nav
       aria-label="Principal"
-      className={`sticky top-0 z-50 motion-safe:transition-all motion-safe:duration-200 ${scrollClass}`}
+      className="sticky top-3 z-50 px-3 md:px-6"
     >
-      <div className="mx-auto w-full max-w-[1280px] px-6 md:px-8">
+      <div
+        className={`mx-auto w-full max-w-[1200px] rounded-2xl border px-6 md:px-8 motion-safe:transition-all motion-safe:duration-200 ${scrollClass}`}
+      >
         <div className="flex h-16 items-center justify-between">
           {/* Logo */}
           <Link
             href="/"
-            className="flex items-center gap-1 font-semibold text-[16px] text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+            aria-label="CycloAI"
           >
-            Cyclo
-            <span className="text-primary">AI</span>
+            <Image
+              src="/img/logo.png"
+              alt="CycloAI"
+              width={80}
+              height={80}
+              priority
+              className="h-16 w-16"
+            />
           </Link>
 
           {/* Center nav links — desktop only */}
@@ -82,7 +92,7 @@ export default function Navbar() {
             <Button variant="ghost" href="/login">
               Iniciar sesión
             </Button>
-            <Button variant="outline" href="/login">
+            <Button variant="primary" href="/login">
               Empezar gratis
             </Button>
           </div>
