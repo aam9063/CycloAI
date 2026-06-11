@@ -1,0 +1,167 @@
+import 'server-only';
+
+import { google } from '@ai-sdk/google';
+import { streamText, convertToModelMessages, type UIMessage } from 'ai';
+import { createClient } from '@/lib/supabase/server';
+import { buildSystemPrompt } from '@/lib/ai/system-prompt';
+import { getUserProfile, getOrCreateConversation, touchConversation } from '@/lib/db/conversations';
+import { insertUserMessage, insertAssistantMessage } from '@/lib/db/messages';
+import { uiMessageText } from '@/lib/chat/text';
+
+export const runtime = 'nodejs'; // Supabase SSR cookie client requires Node runtime
+export const maxDuration = 60;  // Vercel Hobby hard cap (60 s); guards long Gemini streams
+
+export async function POST(req: Request) {
+  // 1. Auth — verify Supabase session cookie
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return new Response('No autorizado', { status: 401 });
+  }
+
+  // 2. Parse request body
+  const { messages, conversationId } = (await req.json()) as {
+    messages: UIMessage[];
+    conversationId?: string | null;
+  };
+
+  if (!messages || messages.length === 0) {
+    return new Response('Solicitud inválida', { status: 400 });
+  }
+
+  // 3. Load user profile (needed for system prompt)
+  const profile = await getUserProfile(supabase, user.id);
+  if (!profile) {
+    return new Response('Perfil no encontrado', { status: 500 });
+  }
+
+  // 4. Resolve conversation (create or verify ownership)
+  const lastUserMessage = messages[messages.length - 1];
+  const lastText = uiMessageText(lastUserMessage);
+
+  let convId: string;
+  try {
+    convId = await getOrCreateConversation(supabase, user.id, conversationId, lastText);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : '';
+    if (msg === 'forbidden') return new Response('Acceso denegado', { status: 403 });
+    if (msg === 'not_found') return new Response('Conversación no encontrada', { status: 404 });
+    return new Response('Error interno', { status: 500 });
+  }
+
+  // 5. Persist user message BEFORE streaming (durability if stream fails)
+  await insertUserMessage(supabase, {
+    conversationId: convId,
+    userId: user.id,
+    content: lastText,
+  });
+
+  // 6. Build system prompt (ragContext empty this slice — RAG deferred)
+  const systemPrompt = buildSystemPrompt(profile, '');
+
+  // 7. Stream via Gemini 3.5 Flash
+  const modelMessages = await convertToModelMessages(messages);
+
+  // W-1 fix: guard against double-insert when both onAbort and onFinish fire on user stop.
+  // onAbort fires first (partial text); we set this flag so onFinish skips its insert.
+  let persistedByAbort = false;
+
+  // W-2 fix: track whether a mid-stream error is a rate-limit so the stream error
+  // chunk carries the right copy to the client. streamText's onError fires for errors
+  // that surface inside the stream (e.g. mid-stream Gemini 429s — HTTP 200 body errors).
+  // We set a flag here; toUIMessageStreamResponse's onError reads it to return the
+  // appropriate string, which becomes error.message in useChat on the client.
+  let midStreamIs429 = false;
+
+  let result;
+  try {
+    result = streamText({
+      model: google('gemini-3.5-flash'),
+      system: systemPrompt,
+      messages: modelMessages,
+      // Gemini 3.5 Flash is a reasoning model: its internal thinking tokens consume
+      // the same output budget. 2048 left only a few hundred tokens of visible text
+      // (responses cut mid-sentence with finishReason 'length'). 8192 fits full
+      // weekly plans; thinkingLevel 'low' keeps latency and token burn down.
+      maxOutputTokens: 8192,
+      providerOptions: {
+        google: {
+          thinkingConfig: { thinkingLevel: 'low' },
+        },
+      },
+      abortSignal: req.signal,  // propagates client stop() / disconnects
+      onError: ({ error }) => {
+        // Fires for errors that surface inside the stream (mid-stream provider errors).
+        // Mark 429s so toUIMessageStreamResponse can embed the right error copy.
+        const msg = error instanceof Error ? error.message : String(error);
+        // BUG-1a: log provider errors so dev/server logs show failures (no secrets — only message text)
+        console.error('[chat] mid-stream provider error:', msg);
+        if (msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('quota')) {
+          midStreamIs429 = true;
+        }
+      },
+      onFinish: async ({ text, finishReason }) => {
+        // W-1 fix: if onAbort already persisted a row, skip this insert.
+        if (persistedByAbort) return;
+        const isAborted = finishReason !== 'stop' && finishReason !== 'length';
+        await insertAssistantMessage(supabase, {
+          conversationId: convId,
+          userId: user.id,
+          content: text,
+          // Always persist finishReason: 'length' cuts and provider anomalies
+          // are diagnosable from the DB without reproducing.
+          metadata: isAborted ? { aborted: true, finishReason } : { finishReason },
+        });
+        await touchConversation(supabase, convId);
+      },
+      onAbort: async ({ steps }) => {
+        // Fires when abortSignal fires (user stop / client disconnect) mid-stream.
+        // Accumulate partial text from all steps so far.
+        const partial = steps
+          .map((s) => s.text ?? '')
+          .join('');
+        persistedByAbort = true; // W-1: signal onFinish to skip its insert
+        await insertAssistantMessage(supabase, {
+          conversationId: convId,
+          userId: user.id,
+          content: partial,
+          metadata: { aborted: true }, // SG-1: spec says { aborted: true }
+        });
+        await touchConversation(supabase, convId);
+      },
+    });
+  } catch (err) {
+    // Catch 429 rate-limit from Gemini before streaming starts (synchronous/config errors)
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    // BUG-1a: log pre-stream errors so server logs show provider failures (no secrets)
+    console.error('[chat] pre-stream error:', errorMessage);
+    if (errorMessage.includes('429') || errorMessage.toLowerCase().includes('rate')) {
+      // BUG-1b: body text includes '429' so the client-side '429:' prefix check matches
+      return new Response('429: Rate limit', { status: 429 });
+    }
+    return new Response('Error del asistente', { status: 500 });
+  }
+
+  // 8. Return streaming response with the conversation id in a response header.
+  // W-2 fix: toUIMessageStreamResponse's onError embeds the error message into the
+  // UI message stream protocol. The client's useChat surfaces it as error.message,
+  // which ChatInterface.tsx already inspects for '429' to pick the right Spanish copy.
+  // Mechanism: streamText.onError sets midStreamIs429 → toUIMessageStreamResponse.onError
+  // returns a string containing '429' → useChat.error.message contains '429' → client
+  // shows "El asistente está saturado. Inténtalo de nuevo en un momento."
+  return result.toUIMessageStreamResponse({
+    headers: {
+      'X-Conversation-Id': convId,
+    },
+    onError: (error) => {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (midStreamIs429 || msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('quota')) {
+        return '429: El asistente está saturado.';
+      }
+      return 'Error del asistente';
+    },
+  });
+}

@@ -50,7 +50,7 @@ Chat streaming   Vercel AI SDK (useChat, useCompletion)
 Auth             Supabase Auth (email/password + Google OAuth)
 Strava           Strava API v3 REST — integración opcional desde perfil
 Base de datos    Supabase (PostgreSQL + pgvector)
-IA               Anthropic Claude API (claude-sonnet-4-6)
+IA               Google Gemini 3.5 Flash via AI SDK v6 (ai + @ai-sdk/google + @ai-sdk/react)
 Embeddings       Voyage AI (voyage-2) o OpenAI text-embedding-3-small
 Caché            Upstash Redis (free tier suficiente para MVP)
 Deploy           Vercel (free Hobby tier para MVP)
@@ -65,8 +65,8 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-# Anthropic
-ANTHROPIC_API_KEY=
+# Google AI (Gemini 3.5 Flash — server-only, never NEXT_PUBLIC_)
+GOOGLE_GENERATIVE_AI_API_KEY=
 
 # Strava OAuth
 STRAVA_CLIENT_ID=
@@ -380,20 +380,26 @@ export async function POST(req: Request) {
   // 6. Cargar historial reciente (últimos 20 mensajes)
   const history = await getConversationHistory(conversationId, 20)
 
-  // 7. Llamar a Claude API con streaming
-  const stream = await anthropic.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 2048,
+  // 7. Llamar a Gemini via AI SDK v6 con streaming
+  const result = streamText({
+    model: google('gemini-3.5-flash'),
+    maxOutputTokens: 2048,
     system: systemPrompt,
-    messages: [...history, ...messages],
-    tools: getChatTools(),
+    messages: convertToModelMessages(messages),
+    abortSignal: req.signal,
+    onFinish: async ({ text }) => {
+      await insertAssistantMessage({ conversationId, userId: user.id, content: text })
+      await touchConversation(conversationId)
+    },
   })
 
-  // 8. Persistir mensaje del usuario
-  await saveMessage({ conversationId, role: 'user', content: lastMessage })
+  // 8. Persistir mensaje del usuario (ANTES del stream)
+  await insertUserMessage({ conversationId, userId: user.id, content: lastMessage })
 
-  // 9. Stream response + persistir respuesta del asistente al completar
-  return stream.toReadableStream()
+  // 9. Stream response con X-Conversation-Id header
+  return result.toUIMessageStreamResponse({
+    headers: { 'X-Conversation-Id': conversationId },
+  })
 }
 ```
 
@@ -671,7 +677,7 @@ Componente Strava: `components/profile/StravaConnect.tsx`
 - Tool calls: get_activities, save_plan, calculate_nutrition, trigger_sync
 - Historial: últimos 20 mensajes en contexto
 - Memoria persistente: últimos planes activos inyectados en system prompt
-- Modelo: claude-sonnet-4-6
+- Modelo: gemini-3.5-flash (via @ai-sdk/google)
 
 ### `/specs/rag-system.md`
 - Ver archivo separado `RAG_GUIDE.md` para implementación completa
