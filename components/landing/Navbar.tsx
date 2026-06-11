@@ -41,6 +41,7 @@ export default function Navbar() {
   }, [open]);
 
   const navLinks = [
+    { href: "#como-funciona", label: "Cómo funciona" },
     { href: "#funcionalidades", label: "Funcionalidades" },
     { href: "#precios", label: "Precios" },
   ];
@@ -92,7 +93,7 @@ export default function Navbar() {
             <Button variant="ghost" href="/login">
               Iniciar sesión
             </Button>
-            <Button variant="primary" href="/login">
+            <Button variant="primary" href="/register">
               Empezar gratis
             </Button>
           </div>
@@ -136,7 +137,7 @@ export default function Navbar() {
             <Button variant="outline" href="/login">
               Iniciar sesión
             </Button>
-            <Button variant="primary" href="/login">
+            <Button variant="primary" href="/register">
               Empezar gratis
             </Button>
           </div>
