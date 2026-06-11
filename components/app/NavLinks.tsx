@@ -12,7 +12,7 @@ export default function NavLinks() {
 
   return (
     <nav aria-label="Principal">
-      <div className="flex items-center gap-6 text-[14px]">
+      <div className="flex items-center gap-2 text-[14px]">
         {links.map(({ href, label }) => {
           const isActive = pathname === href;
           return (
@@ -22,8 +22,8 @@ export default function NavLinks() {
               aria-current={isActive ? "page" : undefined}
               className={
                 isActive
-                  ? "text-ink font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-                  : "text-ink-mute hover:text-ink transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  ? "rounded-full bg-canvas-soft px-3 py-1.5 text-ink font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                  : "rounded-full px-3 py-1.5 text-ink-mute hover:text-ink hover:bg-canvas-soft/60 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
               }
             >
               {label}

@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Container from "@/components/ui/Container";
 
 const productLinks = [
@@ -19,9 +20,13 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand column */}
           <div className="flex flex-col gap-2">
-            <span className="font-semibold text-[16px] text-ink">
-              Cyclo<span className="text-primary">AI</span>
-            </span>
+            <Image
+              src="/img/logo.png"
+              alt="CycloAI"
+              width={48}
+              height={48}
+              className="h-12 w-12"
+            />
             <p>Tu entrenador personal de ciclismo</p>
             <p className="mt-2">© 2026 CycloAI</p>
           </div>

@@ -22,7 +22,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   outline:
     "bg-canvas text-ink border border-hairline-strong hover:bg-canvas-soft focus-visible:outline-ink",
   ghost:
-    "bg-transparent text-ink hover:underline underline-offset-4 focus-visible:outline-ink px-0 py-0 min-h-0",
+    "bg-transparent text-ink hover:text-ink-mute focus-visible:outline-ink px-0 py-0 min-h-0",
 };
 
 const base =

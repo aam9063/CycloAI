@@ -4,6 +4,7 @@ import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { createClient } from '@/lib/supabase/server';
 import { buildSystemPrompt } from '@/lib/ai/system-prompt';
+import { searchKnowledgeBase } from '@/lib/ai/rag';
 import { getUserProfile, getOrCreateConversation, touchConversation } from '@/lib/db/conversations';
 import { insertUserMessage, insertAssistantMessage } from '@/lib/db/messages';
 import { uiMessageText } from '@/lib/chat/text';
@@ -59,8 +60,12 @@ export async function POST(req: Request) {
     content: lastText,
   });
 
-  // 6. Build system prompt (ragContext empty this slice — RAG deferred)
-  const systemPrompt = buildSystemPrompt(profile, '');
+  // 6. Retrieve RAG context then build system prompt.
+  // searchKnowledgeBase returns '' on any failure — RAG is additive, never blocking.
+  // Adds ~100-250ms (embed + RPC) before first token; sequential by design (system prompt
+  // must be fully formed before streaming begins).
+  const ragContext = await searchKnowledgeBase(lastText);
+  const systemPrompt = buildSystemPrompt(profile, ragContext);
 
   // 7. Stream via Gemini 3.5 Flash
   const modelMessages = await convertToModelMessages(messages);
@@ -76,10 +81,15 @@ export async function POST(req: Request) {
   // appropriate string, which becomes error.message in useChat on the client.
   let midStreamIs429 = false;
 
+  // Model is env-overridable: when gemini-3.5-flash hits capacity throttling
+  // ("high demand" errors on the free tier), set GEMINI_CHAT_MODEL=gemini-3.1-flash
+  // in .env to switch to the stable workhorse without a code change.
+  const chatModel = process.env.GEMINI_CHAT_MODEL ?? 'gemini-3.5-flash';
+
   let result;
   try {
     result = streamText({
-      model: google('gemini-3.5-flash'),
+      model: google(chatModel),
       system: systemPrompt,
       messages: modelMessages,
       // Gemini 3.5 Flash is a reasoning model: its internal thinking tokens consume
@@ -87,9 +97,16 @@ export async function POST(req: Request) {
       // (responses cut mid-sentence with finishReason 'length'). 8192 fits full
       // weekly plans; thinkingLevel 'low' keeps latency and token burn down.
       maxOutputTokens: 8192,
+      // Free tier: the SDK's default 3 internal retries burn quota against
+      // rate-limit walls within seconds (windows reset per minute). One retry max.
+      maxRetries: 1,
       providerOptions: {
         google: {
-          thinkingConfig: { thinkingLevel: 'low' },
+          // thinkingLevel is a Gemini 3.x-only option; 2.5 models use the numeric
+          // thinkingBudget (0 = thinking disabled — full output budget goes to text).
+          thinkingConfig: chatModel.startsWith('gemini-3')
+            ? { thinkingLevel: 'low' }
+            : { thinkingBudget: 0 },
         },
       },
       abortSignal: req.signal,  // propagates client stop() / disconnects
@@ -99,7 +116,18 @@ export async function POST(req: Request) {
         const msg = error instanceof Error ? error.message : String(error);
         // BUG-1a: log provider errors so dev/server logs show failures (no secrets — only message text)
         console.error('[chat] mid-stream provider error:', msg);
-        if (msg.includes('429') || msg.toLowerCase().includes('rate limit') || msg.toLowerCase().includes('quota')) {
+        const lower = msg.toLowerCase();
+        // Saturation family: hard 429s, quota, AND Google's capacity throttling
+        // ("high demand" / overloaded / unavailable) — all map to the retryable copy.
+        if (
+          lower.includes('429') ||
+          lower.includes('rate limit') ||
+          lower.includes('quota') ||
+          lower.includes('high demand') ||
+          lower.includes('overloaded') ||
+          lower.includes('resource_exhausted') ||
+          lower.includes('unavailable')
+        ) {
           midStreamIs429 = true;
         }
       },
@@ -152,9 +180,20 @@ export async function POST(req: Request) {
   // Mechanism: streamText.onError sets midStreamIs429 → toUIMessageStreamResponse.onError
   // returns a string containing '429' → useChat.error.message contains '429' → client
   // shows "El asistente está saturado. Inténtalo de nuevo en un momento."
+  //
+  // Continue-on-cut: attach finishReason to the UI message metadata so the client
+  // can show a "Continuar" affordance when the stream ends abnormally.
+  // The messageMetadata callback fires on 'start' and 'finish' parts; we only act
+  // on 'finish' where part.finishReason is defined.
   return result.toUIMessageStreamResponse({
     headers: {
       'X-Conversation-Id': convId,
+    },
+    messageMetadata: ({ part }) => {
+      if (part.type === 'finish' && part.finishReason) {
+        return { finishReason: part.finishReason } as Record<string, unknown>;
+      }
+      return undefined;
     },
     onError: (error) => {
       const msg = error instanceof Error ? error.message : String(error);

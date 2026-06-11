@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import NavLinks from "@/components/app/NavLinks";
 import UserMenu from "@/components/app/UserMenu";
 import { createClient } from "@/lib/supabase/server";
@@ -32,10 +33,17 @@ export default async function AppLayout({
           <div className="flex items-center gap-8">
             <Link
               href="/"
-              className="flex items-center gap-1 text-[16px] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+              aria-label="CycloAI"
             >
-              Cyclo
-              <span className="text-primary">AI</span>
+              <Image
+                src="/img/logo.png"
+                alt="CycloAI"
+                width={48}
+                height={48}
+                priority
+                className="h-12 w-12"
+              />
             </Link>
             <NavLinks />
           </div>
