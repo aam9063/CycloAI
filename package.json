@@ -12,6 +12,7 @@
   "dependencies": {
     "@ai-sdk/google": "^3.0.80",
     "@ai-sdk/react": "^3.0.203",
+    "@gsap/react": "^2.1.2",
     "@libpdf/core": "^0.3.6",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",

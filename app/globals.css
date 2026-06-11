@@ -59,9 +59,12 @@
   }
 
   /* Tailwind 4 preflight no longer sets cursor: pointer on buttons.
-     Restore it for every enabled interactive control, app-wide. */
+     Restore it for EVERY enabled interactive control, app-wide:
+     buttons, role=button, summary (accordions), and labeled file inputs. */
   button:not(:disabled),
-  [role='button']:not([aria-disabled='true']) {
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  summary {
     cursor: pointer;
   }
 }
