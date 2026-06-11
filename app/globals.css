@@ -57,10 +57,17 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
+
+  /* Tailwind 4 preflight no longer sets cursor: pointer on buttons.
+     Restore it for every enabled interactive control, app-wide. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
 }
 
-/* Onboarding bubble entrance animation — gated by reduced-motion preference.
-   The motion-safe: Tailwind prefix references this keyframe. */
+/* Animations — all gated by reduced-motion preference.
+   Tailwind motion-safe: prefix references these keyframes. */
 @media (prefers-reduced-motion: no-preference) {
   @keyframes onboardingIn {
     from {
@@ -72,6 +79,78 @@
       transform: translateY(0);
     }
   }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+
+  @keyframes slideInLeft {
+    from {
+      opacity: 0;
+      transform: translateX(-16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes menuIn {
+    from {
+      opacity: 0;
+      transform: translateY(-6px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
+
+/* ─── Contained-scroll custom scrollbar ───────────────────────────────────────
+   Applies to the messages area (and sidebar) where overflow-y-auto is set.
+   Goal: invisible at rest, elegantly thin on hover/active scroll.
+   Chrome/Safari/Edge: ::-webkit-scrollbar API.
+   Firefox: scrollbar-width + scrollbar-color.
+   ──────────────────────────────────────────────────────────────────────────── */
+
+.scrollbar-thin {
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 0.2s;
+}
+.scrollbar-thin:hover,
+.scrollbar-thin:focus-within {
+  scrollbar-color: var(--color-hairline-strong) transparent;
+}
+
+/* Chrome / Safari / Edge */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: var(--radius-full);
+  transition: background 0.2s;
+}
+.scrollbar-thin:hover::-webkit-scrollbar-thumb,
+.scrollbar-thin:focus-within::-webkit-scrollbar-thumb {
+  background: var(--color-hairline-strong);
+}
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--color-ink-mute-2);
+}
+
+/* Ensure no horizontal overflow bleeds */
+.chat-no-hscroll {
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
 @layer components {

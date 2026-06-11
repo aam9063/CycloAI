@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Deno edge functions — not part of the Next.js TypeScript project
+    "supabase/functions/**",
   ]),
 ]);
 

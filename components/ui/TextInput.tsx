@@ -70,7 +70,6 @@ const TextInput = forwardRef<HTMLInputElement, TextInputProps>(
           <p
             id={errorId}
             role="alert"
-            aria-live="polite"
             className="text-[13px] text-ink-mute leading-[1.45]"
           >
             {error}
