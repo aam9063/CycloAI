@@ -7,6 +7,7 @@ import { buildSystemPrompt } from '@/lib/ai/system-prompt';
 import { searchKnowledgeBase } from '@/lib/ai/rag';
 import { getUserProfile, getOrCreateConversation, touchConversation } from '@/lib/db/conversations';
 import { insertUserMessage, insertAssistantMessage } from '@/lib/db/messages';
+import { getClientIp, checkRateLimit } from '@/lib/utils/ratelimit';
 import { uiMessageText } from '@/lib/chat/text';
 
 export const runtime = 'nodejs'; // Supabase SSR cookie client requires Node runtime
@@ -23,7 +24,15 @@ export async function POST(req: Request) {
     return new Response('No autorizado', { status: 401 });
   }
 
-  // 2. Parse request body
+  // 2. Per-user chat rate limit — checked before any expensive work.
+  // Uses user.id (authenticated) so each account has its own budget regardless of IP.
+  const ip = await getClientIp();
+  const chatRl = await checkRateLimit({ key: `chat:${user.id}:${ip}`, limit: 15, windowSeconds: 60 });
+  if (!chatRl.success) {
+    return new Response('429: Demasiados mensajes. Espera un momento.', { status: 429 });
+  }
+
+  // 3. Parse request body
   const { messages, conversationId } = (await req.json()) as {
     messages: UIMessage[];
     conversationId?: string | null;
@@ -33,15 +42,26 @@ export async function POST(req: Request) {
     return new Response('Solicitud inválida', { status: 400 });
   }
 
-  // 3. Load user profile (needed for system prompt)
+  // Server-side payload size guards — prevent oversized requests from reaching RAG/stream.
+  // Total payload: ~100 KB cap (cheap serialisation check).
+  if (JSON.stringify(messages).length > 100_000) {
+    return new Response('Solicitud demasiado grande.', { status: 400 });
+  }
+
+  // 4. Load user profile (needed for system prompt)
   const profile = await getUserProfile(supabase, user.id);
   if (!profile) {
     return new Response('Perfil no encontrado', { status: 500 });
   }
 
-  // 4. Resolve conversation (create or verify ownership)
+  // 5. Resolve conversation (create or verify ownership)
   const lastUserMessage = messages[messages.length - 1];
   const lastText = uiMessageText(lastUserMessage);
+
+  // Per-message length cap: 8 000 chars is well above any reasonable user input.
+  if (lastText.length > 8_000) {
+    return new Response('Mensaje demasiado largo.', { status: 400 });
+  }
 
   let convId: string;
   try {
@@ -53,21 +73,21 @@ export async function POST(req: Request) {
     return new Response('Error interno', { status: 500 });
   }
 
-  // 5. Persist user message BEFORE streaming (durability if stream fails)
+  // 6. Persist user message BEFORE streaming (durability if stream fails)
   await insertUserMessage(supabase, {
     conversationId: convId,
     userId: user.id,
     content: lastText,
   });
 
-  // 6. Retrieve RAG context then build system prompt.
+  // 7. Retrieve RAG context then build system prompt.
   // searchKnowledgeBase returns '' on any failure — RAG is additive, never blocking.
   // Adds ~100-250ms (embed + RPC) before first token; sequential by design (system prompt
   // must be fully formed before streaming begins).
   const ragContext = await searchKnowledgeBase(lastText);
   const systemPrompt = buildSystemPrompt(profile, ragContext);
 
-  // 7. Stream via Gemini 3.5 Flash
+  // 8. Stream via Gemini 3.5 Flash
   const modelMessages = await convertToModelMessages(messages);
 
   // W-1 fix: guard against double-insert when both onAbort and onFinish fire on user stop.
@@ -173,7 +193,7 @@ export async function POST(req: Request) {
     return new Response('Error del asistente', { status: 500 });
   }
 
-  // 8. Return streaming response with the conversation id in a response header.
+  // 9. Return streaming response with the conversation id in a response header.
   // W-2 fix: toUIMessageStreamResponse's onError embeds the error message into the
   // UI message stream protocol. The client's useChat surfaces it as error.message,
   // which ChatInterface.tsx already inspects for '429' to pick the right Spanish copy.
