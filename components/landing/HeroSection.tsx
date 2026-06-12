@@ -32,16 +32,21 @@ export default function HeroSection() {
               entrenamiento, gimnasio y nutrición adaptados a tu estado de forma
               real. Sin planes genéricos.
             </p>
-            <div data-hero-item className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-              <Button variant="primary" href="/register">
-                Empezar gratis
-              </Button>
-              <a
-                href="#como-funciona"
-                className="text-[14px] font-medium text-ink-mute hover:text-ink hover:underline underline-offset-4 motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
-              >
-                Ver cómo funciona
-              </a>
+            <div data-hero-item className="flex flex-col items-center md:items-start gap-3">
+              <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
+                <Button variant="primary" href="#waitlist">
+                  Unirme a la lista de espera
+                </Button>
+                <a
+                  href="#como-funciona"
+                  className="text-[14px] font-medium text-ink-mute hover:text-ink hover:underline underline-offset-4 motion-safe:transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
+                >
+                  Ver cómo funciona
+                </a>
+              </div>
+              <p className="text-[13px] text-ink-mute">
+                Los primeros 100 obtienen 3 meses de Premium gratis.
+              </p>
             </div>
           </div>
 

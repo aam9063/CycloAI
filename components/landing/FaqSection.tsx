@@ -28,9 +28,9 @@ const faqs = [
       "Sí. Tus datos se almacenan cifrados en servidores de la Unión Europea, nunca se venden a terceros y no se usan para entrenar modelos de IA de terceros. Además, puedes eliminar tu cuenta y todos tus datos en cualquier momento desde tu perfil.",
   },
   {
-    question: "¿Funciona sin Strava?",
+    question: "¿Cuándo estará disponible?",
     answer:
-      "Sí. La integración con Strava está en desarrollo y llegará próximamente. Con ella, CycloAI analizará tu carga real, calculará tu FTP y afinará cada plan con tus datos objetivos. Sin ella, funciona igualmente bien usando el perfil que completas en el onboarding.",
+      "Estamos en acceso anticipado. Únete a la lista de espera y te avisaremos por email en cuanto tu plaza esté lista. Los primeros 100 inscritos reciben 3 meses de Premium gratis.",
   },
 ];
 

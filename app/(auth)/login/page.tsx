@@ -88,14 +88,14 @@ export default function LoginPage() {
         </a>
       </div>
 
-      {/* Cross-link to register */}
+      {/* Cross-link to waitlist */}
       <p className="mt-6 text-center text-[13px] text-ink-mute">
         ¿No tienes cuenta?{" "}
         <Link
-          href="/register"
+          href="/#waitlist"
           className="text-ink font-medium hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink"
         >
-          Regístrate
+          Únete a la lista de espera
         </Link>
       </p>
     </>

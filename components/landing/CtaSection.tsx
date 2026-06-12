@@ -1,31 +1,34 @@
 import { LuCheck } from "react-icons/lu";
 import Container from "@/components/ui/Container";
-import Button from "@/components/ui/Button";
+import WaitlistForm from "@/components/landing/WaitlistForm";
 
 const reassurances = [
-  "Sin tarjeta de crédito",
-  "Listo en 2 minutos",
-  "Cancela cuando quieras",
+  "Sin spam",
+  "Solo te avisaremos del lanzamiento",
+  "Baja cuando quieras",
 ];
 
 export default function CtaSection() {
   return (
-    <section className="py-24 bg-canvas-night">
+    <section id="waitlist" className="scroll-mt-20 py-24 bg-canvas-night">
       <Container className="text-center">
         <p className="text-[13px] font-medium uppercase tracking-wider text-primary mb-4">
-          Tu entrenador te espera
+          Acceso anticipado
         </p>
         <h2 className="display-lg text-on-dark mb-4 max-w-2xl mx-auto">
-          Deja de adivinar. Empieza a entrenar con criterio.
+          Sé de los primeros en entrenar con CycloAI
         </h2>
         <p className="text-[18px] leading-[1.55] text-on-dark/70 mb-10 max-w-xl mx-auto">
-          Crea tu cuenta, responde 6 preguntas y recibe hoy mismo un plan de
-          entrenamiento, gimnasio y nutrición hecho para ti. No para el ciclista
-          promedio.
+          Estamos abriendo el acceso por orden de lista. Los primeros 100
+          inscritos obtienen 3 meses de Premium gratis al lanzamiento.
         </p>
-        <Button variant="primary" href="/register">
-          Empezar gratis
-        </Button>
+
+        {/* Waitlist form — centered, constrained width */}
+        <div className="mx-auto max-w-md">
+          <WaitlistForm source="landing-cta" />
+        </div>
+
+        {/* Reassurance row */}
         <ul className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
           {reassurances.map((item) => (
             <li
