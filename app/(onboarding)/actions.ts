@@ -127,7 +127,8 @@ export async function saveOnboardingAnswer(
     }
 
     case "target_event": {
-      const trimmed = String(rawValue ?? "").trim();
+      // Cap at 200 chars before storing — this value is interpolated into the system prompt.
+      const trimmed = String(rawValue ?? "").trim().slice(0, 200);
       // Store "" (empty string) as non-null marker so derivation counts it answered.
       dbValue = trimmed;
       break;

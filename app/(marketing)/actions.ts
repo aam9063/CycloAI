@@ -1,6 +1,7 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { getClientIp, checkRateLimit } from "@/lib/utils/ratelimit";
 
 export type WaitlistResult = {
   ok?: boolean;
@@ -10,17 +11,37 @@ export type WaitlistResult = {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+// Known source values the client is allowed to send.
+const VALID_SOURCES = new Set([
+  "landing-hero",
+  "landing-cta",
+  "landing-pricing",
+  "landing-nav",
+]);
+
 export async function joinWaitlist(
   _prev: WaitlistResult,
   formData: FormData
 ): Promise<WaitlistResult> {
-  const raw = (formData.get("email") as string | null) ?? "";
-  const source = (formData.get("source") as string | null) ?? "unknown";
+  // Rate-limit before any validation to stop floods cheaply.
+  const ip = await getClientIp();
+  const rl = await checkRateLimit({ key: `waitlist:${ip}`, limit: 5, windowSeconds: 60 });
+  if (!rl.success) {
+    return { error: "Demasiados intentos. Inténtalo de nuevo en un minuto." };
+  }
 
+  // Email: trim, RFC 5321 length cap, regex, normalise.
+  const raw = (formData.get("email") as string | null) ?? "";
   const email = raw.trim().toLowerCase();
 
   if (!email) return { error: "El correo es obligatorio." };
-  if (!EMAIL_RE.test(email)) return { error: "Introduce un correo válido." };
+  if (email.length > 320) return { error: "El correo no es válido." };
+  if (!EMAIL_RE.test(email)) return { error: "El correo no es válido." };
+
+  // Source: cap length, then whitelist — never store arbitrary client strings.
+  const rawSource = formData.get("source") as string | null;
+  const sourceCandidate = String(rawSource ?? "").slice(0, 50);
+  const source = VALID_SOURCES.has(sourceCandidate) ? sourceCandidate : "unknown";
 
   const supabase = await createClient();
 
@@ -33,7 +54,7 @@ export async function joinWaitlist(
     if (error.code === "23505") {
       return { ok: true, already: true, error: null };
     }
-    return { error: "Algo salió mal. Intenta de nuevo en un momento." };
+    return { error: "Algo salió mal. Inténtalo de nuevo en un momento." };
   }
 
   return { ok: true, error: null };
