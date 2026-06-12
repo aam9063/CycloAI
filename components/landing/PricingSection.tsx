@@ -218,10 +218,10 @@ export default function PricingSection() {
                 {/* CTA */}
                 <Button
                   variant={featured ? "primary" : "outline"}
-                  href="/register"
+                  href="/#waitlist"
                   className="w-full justify-center"
                 >
-                  {tier.cta}
+                  Unirme a la lista
                 </Button>
               </div>
             );

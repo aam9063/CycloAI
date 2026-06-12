@@ -122,6 +122,12 @@ export async function registerAction(
   _prev: AuthResult,
   formData: FormData
 ): Promise<AuthResult> {
+  // WAITLIST MODE: registration locked — remove this guard to re-open signups.
+  return {
+    error:
+      "El registro está cerrado temporalmente. Únete a la lista de espera en cycloai para recibir acceso anticipado.",
+  };
+
   const name = (formData.get("name") as string | null) ?? "";
   const email = (formData.get("email") as string | null) ?? "";
   const password = (formData.get("password") as string | null) ?? "";
@@ -130,9 +136,9 @@ export async function registerAction(
   const fieldErrors: FieldErrors = {};
   if (!name.trim()) fieldErrors.name = "El nombre es obligatorio.";
   const emailError = validateEmail(email);
-  if (emailError) fieldErrors.email = emailError;
+  if (emailError) fieldErrors.email = emailError ?? undefined;
   const passwordError = validatePassword(password, true);
-  if (passwordError) fieldErrors.password = passwordError;
+  if (passwordError) fieldErrors.password = passwordError ?? undefined;
   if (Object.keys(fieldErrors).length > 0) {
     return { error: null, fieldErrors };
   }
