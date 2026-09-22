@@ -323,24 +323,48 @@ GymLoad = Annotated[GymLoadPctOneRm | GymLoadAbsoluteKg, Field(discriminator="ki
 
 
 class GymSet(BaseModel):
-    """One set: reps plus optional RIR, load and tempo."""
+    """One set: reps plus optional RIR, load, tempo and unit.
+
+    Corpus rep forms (``docs/gym.txt``): a plain count (``3X12``), a per-set
+    range (``4x25-30``, ``3x8/10`` -> ``reps`` is the lower bound and
+    ``reps_max`` the upper bound), and an explicit descending per-set ramp
+    (``5x20-15-15-10-10``), which is one :class:`GymSet` per element of
+    ``GymExercise.sets`` (the leading number is the list length). The corpus
+    also counts a non-rep unit once (``10 PASOS A CADA DIRECCIÓN``); that is
+    carried by ``unit`` rather than coerced into a fabricated rep meaning.
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     reps: int = Field(gt=0)
+    reps_max: Annotated[int | None, Field(gt=0)] = None
+    unit: Literal["reps", "steps"] = "reps"
     rir: Annotated[int | None, Field(ge=0)] = None
     load: GymLoad | None = None
     tempo: str | None = None
 
+    @model_validator(mode="after")
+    def _enforce_rep_range(self) -> GymSet:
+        if self.reps_max is not None and self.reps_max < self.reps:
+            raise ValueError("reps_max must not be lower than reps")
+        return self
+
 
 class GymExercise(BaseModel):
-    """An exercise with its sets and optional rest."""
+    """An exercise with its sets, optional rest and optional verbatim note.
+
+    ``rest_s`` is expressed in seconds (corpus ``1´ 30´´ REC`` -> 90). ``note``
+    carries the author's free prose verbatim (``(la primera de calentamiento)``);
+    tempo and similar remarks stay prose because the corpus never structures
+    them, so no structured tempo field is modelled.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     name: str
     sets: Annotated[list[GymSet], Field(min_length=1)]
     rest_s: Annotated[int | None, Field(gt=0)] = None
+    note: str | None = None
 
 
 class GymBlockName(StrEnum):
@@ -350,9 +374,27 @@ class GymBlockName(StrEnum):
     UPPER_BODY = "TREN SUPERIOR"
     CORE = "CORE"
 
+    @classmethod
+    def from_header(cls, header: str) -> GymBlockName:
+        """Map the three corpus header forms (``- TREN INFERIOR:``, ``CORE:``)
+        onto the block identity; the leading dash and trailing colon are
+        formatting and carry no identity, so all three forms survive."""
+        text = header.strip()
+        if text.startswith("-"):
+            text = text[1:].strip()
+        if text.endswith(":"):
+            text = text[:-1].strip()
+        return cls(text)
+
 
 class GymBlock(BaseModel):
-    """A gym session block: activation, main exercises and core work."""
+    """A gym session block: activation, main exercises, core work and prose lines.
+
+    The ``ACTIVACIÓN:`` sub-header is already covered by the ``activation``
+    list, so no extra section type is modelled. ``prose_items`` carries
+    first-class freeform lines verbatim (the whole hand-written CORE block,
+    ``SIN CALENTAMIENTO.``, the warm-up line) with no fabricated structure.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -360,6 +402,7 @@ class GymBlock(BaseModel):
     activation: list[GymExercise] = []
     exercises: list[GymExercise] = []
     core: list[GymExercise] = []
+    prose_items: list[str] = []
 
 
 # --- Plan level --------------------------------------------------------------------------

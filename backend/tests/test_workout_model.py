@@ -389,6 +389,101 @@ def test_gym_block_name_is_the_closed_corpus_vocabulary() -> None:
         GymBlock(name="BRAZOS")
 
 
+# --- Gym corpus extensions: rep ramps, ranges, prose, units, identity ---
+
+
+def test_gym_set_rep_ramp_is_an_explicit_per_set_list() -> None:
+    """``5x20-15-15-10-10``: the leading 5 is the set count and each element
+    carries its own reps, so a descending ramp needs no invented structure."""
+    exercise = GymExercise(name="Prensa", sets=[GymSet(reps=reps) for reps in (20, 15, 15, 10, 10)])
+    assert [s.reps for s in exercise.sets] == [20, 15, 15, 10, 10]
+    assert len(exercise.sets) == 5
+
+
+def test_gym_set_rep_range_keeps_both_bounds() -> None:
+    """``4x25-30`` and ``3x8/10``: a set spans a range, which a single reps
+    integer cannot represent."""
+    ranged = GymSet(reps=25, reps_max=30)
+    alternative = GymSet(reps=8, reps_max=10)
+    assert (ranged.reps, ranged.reps_max) == (25, 30)
+    assert (alternative.reps, alternative.reps_max) == (8, 10)
+
+
+def test_gym_set_rejects_a_range_with_max_below_min() -> None:
+    """Negative case: the corpus never writes a descending range like
+    ``4x30-25`` — only per-set ramps descend, and those are modelled as one
+    ``GymSet`` per element, never as an inverted range."""
+    with pytest.raises(ValidationError):
+        GymSet(reps=30, reps_max=25)
+
+
+@pytest.mark.parametrize("rir", [None, 4, 5])
+def test_gym_set_rir_is_optional(rir: int | None) -> None:
+    """RIR appears on only 3 of ~19 corpus exercises; it must never be required."""
+    assert GymSet(reps=12, rir=rir).rir == rir
+
+
+def test_gym_exercise_rest_is_expressed_in_seconds() -> None:
+    """Spanish rest notation maps onto seconds: ``1´ 30´´ REC`` -> 90,
+    ``30´´ REC`` -> 30."""
+    assert GymExercise(name="Prensa", rest_s=90, sets=[GymSet(reps=12)]).rest_s == 90
+    assert GymExercise(name="Abducciones", rest_s=30, sets=[GymSet(reps=15)]).rest_s == 30
+
+
+def test_gym_exercise_note_is_preserved_verbatim() -> None:
+    """Author prose stays a verbatim string; no structured tempo field exists."""
+    note = "(LAS DOS PRIMERAS A RITMO NORMAL, LAS DOS ÚLTIMAS BAJAS DENTO (4 SEG))"
+    exercise = GymExercise(name="Press banca", note=note, sets=[GymSet(reps=12)])
+    assert exercise.note == note
+
+
+def test_gym_set_supports_non_reps_units() -> None:
+    """``CAMINATA LATERAL CON BANDA ELÁSTICA: 10 PASOS A CADA DIRECCIÓN.``
+    counts steps; the unit is modelled, not coerced into a rep meaning."""
+    exercise = GymExercise(
+        name="Caminito lateral con banda elástica",
+        sets=[GymSet(reps=10, unit="steps")],
+    )
+    assert exercise.sets[0].unit == "steps"
+    assert exercise.sets[0].reps == 10
+    # The unit vocabulary is closed to what the corpus provides.
+    with pytest.raises(ValidationError):
+        GymSet(reps=10, unit="meters")
+
+
+def test_gym_block_carries_freeform_prose_items_verbatim() -> None:
+    """The CORE block is hand-written prose with no sets; each line is kept
+    verbatim, with no fabricated exercise or set structure."""
+    prose = [
+        "PLANCHA FRONTAL 2 APOYOS (codo y pie contrario) 15” cada lado",
+        "PUENTE DE PIERNAS FITBALL A UNA PIERNA 10 reps/pierna",
+        "SIN CALENTAMIENTO.",
+    ]
+    block = GymBlock(name=GymBlockName.CORE, prose_items=prose)
+    assert block.prose_items == prose
+    assert block.prose_items[0] == "PLANCHA FRONTAL 2 APOYOS (codo y pie contrario) 15” cada lado"
+
+
+def test_gym_block_identity_survives_all_three_header_forms() -> None:
+    """Two headers carry a leading dash, one does not; all three collapse onto
+    the same closed block identity."""
+    for header, expected in (
+        ("- TREN INFERIOR:", GymBlockName.LOWER_BODY),
+        ("- TREN SUPERIOR:", GymBlockName.UPPER_BODY),
+        ("CORE:", GymBlockName.CORE),
+    ):
+        assert GymBlockName.from_header(header) is expected
+        assert GymBlock(name=GymBlockName.from_header(header)).name is expected
+
+
+def test_gym_activation_subheader_is_covered_by_the_activation_list() -> None:
+    """``ACTIVACIÓN:`` groups three exercises; the existing ``activation`` list
+    already marks that section, so no additional section type is modelled."""
+    activation = [GymExercise(name=f"Activación {i}", sets=[GymSet(reps=12)]) for i in range(3)]
+    block = GymBlock(name=GymBlockName.LOWER_BODY, activation=activation)
+    assert len(block.activation) == 3
+
+
 # --- Plan level ---
 
 

@@ -1,0 +1,323 @@
+{
+  "activation": [
+    {
+      "name": "CLAMSHELL GLUTEO",
+      "note": "A CADA LADO",
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "CAMINATA LATERAL CON BANDA ELÁSTICA",
+      "note": "A CADA DIRECCIÓN",
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "steps"
+        }
+      ]
+    },
+    {
+      "name": "ABDUCCIÓN DE CADERA CON BANDA ELÁSTICA",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    }
+  ],
+  "core": [],
+  "exercises": [
+    {
+      "name": "Prensa",
+      "note": "la primera de calentamiento",
+      "rest_s": 90,
+      "sets": [
+        {
+          "load": null,
+          "reps": 20,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Extensión de isquios",
+      "note": "LAS DOS PRIMERAS A RITMO NORMAL, LAS DOS ÚLTIMAS BAJAS DENTO (4 SEG",
+      "rest_s": 120,
+      "sets": [
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": 5,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Subida al cajón",
+      "note": null,
+      "rest_s": 120,
+      "sets": [
+        {
+          "load": null,
+          "reps": 15,
+          "reps_max": null,
+          "rir": 4,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": 4,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": 4,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": 4,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Hip thrust",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": 10,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": 10,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": 10,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Gemelo",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 14,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 14,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 14,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 14,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Crunch de abdomen",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": 30,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": 30,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": 30,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": 30,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    }
+  ],
+  "name": "TREN INFERIOR",
+  "prose_items": [
+    "10´ de calentamiento en elíptica, comba, bici, etc.",
+    "3 planchas de 1 minuto."
+  ]
+}
