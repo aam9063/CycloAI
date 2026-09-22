@@ -1,0 +1,113 @@
+{
+  "free_text": null,
+  "label": "E5",
+  "name": null,
+  "repeat_markers": [],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 30,
+        "raw": "30 min"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 15,
+        "raw": "15 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 15,
+        "raw": "15 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 15,
+        "raw": "15 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 40,
+        "raw": "40 min"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    }
+  ]
+}

@@ -1,0 +1,450 @@
+{
+  "free_text": null,
+  "label": null,
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 0,
+      "count": 1
+    },
+    {
+      "after_step_index": 4,
+      "count": 1
+    },
+    {
+      "after_step_index": 8,
+      "count": 1
+    },
+    {
+      "after_step_index": 12,
+      "count": 1
+    },
+    {
+      "after_step_index": 16,
+      "count": 1
+    },
+    {
+      "after_step_index": 20,
+      "count": 1
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "clock": "30:35",
+        "kind": "clock",
+        "raw": "30:35"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [
+        "APRIETA"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "APRIETA",
+        "kind": "zone",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "A TOPE"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO | A TOPE",
+        "kind": "zone",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "NO TIENES QUE LLEGAR A ESTE PULSO"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "NO TIENES QUE LLEGAR A ESTE PULSO",
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "clock": "35:25",
+        "kind": "clock",
+        "raw": "35:25"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    }
+  ]
+}

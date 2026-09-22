@@ -1,0 +1,199 @@
+{
+  "free_text": null,
+  "label": null,
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 0,
+      "count": 5
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "clock": "34:15",
+        "kind": "clock",
+        "raw": "34:15"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 2,
+        "raw": "2 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 50,
+        "min_rpm": 50
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 1,
+        "raw": "1 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 9,
+        "raw": "9 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 2,
+        "raw": "2 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 2,
+        "raw": "2 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 2,
+        "raw": "2 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z5B"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 40,
+        "raw": "40 min"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    }
+  ]
+}

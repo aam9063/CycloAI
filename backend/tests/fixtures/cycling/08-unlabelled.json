@@ -1,0 +1,148 @@
+{
+  "free_text": null,
+  "label": null,
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 4,
+      "count": 1
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 30,
+        "raw": "30 min"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 20,
+        "raw": "20 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 13,
+        "raw": "13 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 20,
+        "raw": "20 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 13,
+        "raw": "13 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z4"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 40,
+        "raw": "40 min"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "zone": "Z1"
+      }
+    }
+  ]
+}
