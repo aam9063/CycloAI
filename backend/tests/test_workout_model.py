@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from cycloai.domain.workout import (
+    CadenceTarget,
     ClockDuration,
     CyclingBlock,
     CyclingStep,
@@ -16,6 +17,7 @@ from cycloai.domain.workout import (
     GymSet,
     MinutesDuration,
     PlanWeek,
+    RpeTarget,
     SecondsDuration,
     StepRole,
     TrainingPlan,
@@ -170,6 +172,67 @@ def test_i2_valid_corpus_codes_are_accepted() -> None:
         assert ZoneTarget(zone=zone).zone.value == zone
 
 
+# --- RPE targets (corpus `@ N RPE`, never carrying a zone label) ---
+
+
+@pytest.mark.parametrize("rpe", [1, 5, 8, 10, 6.5])
+def test_rpe_target_accepts_values_within_1_to_10(rpe: float) -> None:
+    assert RpeTarget(rpe=rpe).rpe == rpe
+
+
+@pytest.mark.parametrize("rpe", [-1, 0, 0.5, 10.5, 11])
+def test_rpe_target_rejects_values_outside_1_to_10(rpe: float) -> None:
+    with pytest.raises(ValidationError):
+        RpeTarget(rpe=rpe)
+
+
+def test_step_can_target_rpe_instead_of_a_zone() -> None:
+    step = make_step(target={"kind": "rpe", "rpe": 8})
+    assert isinstance(step.target, RpeTarget)
+    assert step.target.rpe == 8
+    assert not hasattr(step.target, "zone")
+
+
+def test_step_cannot_carry_both_a_zone_and_an_rpe() -> None:
+    with pytest.raises(ValidationError):
+        make_step(target={"kind": "rpe", "rpe": 8, "zone": "Z2"})
+    with pytest.raises(ValidationError):
+        make_step(target={"kind": "zone", "zone": "Z2", "rpe": 8})
+
+
+def test_rpe_target_rejects_smuggled_bpm() -> None:
+    """RPE is not a loophole around I1: no absolute magnitude may ride along."""
+    with pytest.raises(ValidationError):
+        RpeTarget(rpe=8, bpm=127)
+
+
+# --- Optional cadence (corpus `N-N rpm` and `Nrpm`) ---
+
+
+def test_cadence_window_captures_the_range_form() -> None:
+    step = make_step(cadence={"min_rpm": 85, "max_rpm": 95})
+    assert step.cadence == CadenceTarget(min_rpm=85, max_rpm=95)
+
+
+def test_single_value_cadence_maps_onto_min_equals_max() -> None:
+    cadence = CadenceTarget.from_single(90)
+    assert cadence.min_rpm == cadence.max_rpm == 90
+
+
+def test_cadence_is_optional_and_defaults_to_none() -> None:
+    assert make_step().cadence is None
+
+
+def test_cadence_window_rejects_min_above_max() -> None:
+    with pytest.raises(ValidationError):
+        CadenceTarget(min_rpm=95, max_rpm=85)
+
+
+def test_cadence_rejects_non_positive_rpm() -> None:
+    with pytest.raises(ValidationError):
+        CadenceTarget(min_rpm=0, max_rpm=90)
+
+
 # --- Invariant I5: derived metrics are computed, not supplied ---
 
 
@@ -205,6 +268,24 @@ def test_i5_repeat_count_multiplies_step_durations() -> None:
     repeated = make_prescriptive_workout(blocks=[make_block(steps, repeat_count=3)])
     expanded = make_prescriptive_workout(blocks=[make_block(steps) for _ in range(3)])
     assert repeated.total_duration_s == expanded.total_duration_s == 3 * 1200
+
+
+def test_i5_rpe_steps_count_duration_but_not_tss() -> None:
+    workout = make_prescriptive_workout(
+        blocks=[
+            make_block(
+                [
+                    make_step(target={"kind": "rpe", "rpe": 8}),
+                    make_step("Z1", duration={"kind": "minutes", "minutes": 5}),
+                ],
+                repeat_count=3,
+            )
+        ]
+    )
+    # 3 x (15 + 5) min = 3600 s of total duration...
+    assert workout.total_duration_s == 3600
+    # ...but only the Z1 steps feed the TSS estimate: (900/3600)*20 = 5.0.
+    assert workout.estimated_tss == pytest.approx(5.0)
 
 
 # --- Invariant I6: free-text sessions are a first-class shape ---

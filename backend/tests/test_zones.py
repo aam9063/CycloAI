@@ -55,40 +55,52 @@ def test_corpus_sub_zones_have_no_invented_bounds() -> None:
         ("Zone 3: Tempo", ZoneCode.Z3),
         ("Zone 4: SubThreshold", ZoneCode.Z4),
         ("Zone 5A: SuperThreshold", ZoneCode.Z5A),
-        ("Zone 5B: Aerobic", ZoneCode.Z5B),
-        ("Zone 5C: Anaerobic", ZoneCode.Z5C),
+        ("Zone 5B: Aerobic Capacity", ZoneCode.Z5B),
+        ("Zone 5C: Anaerobic Capacity", ZoneCode.Z5C),
     ],
 )
 def test_mapping_is_keyed_on_the_code_token(label: str, expected: ZoneCode) -> None:
     assert zone_from_label(label) is expected
 
 
-def test_shared_descriptor_maps_to_different_codes() -> None:
-    """`Aerobic` is not the lookup key: Zone 2 and Zone 5B share it and must not collide."""
+def test_descriptors_are_distinct_strings_not_a_collision() -> None:
+    """`Aerobic` (Z2) and `Aerobic Capacity` (Z5B) are different measured strings;
+    the earlier `Zone 5B: Aerobic` reading was a first-space truncation artifact."""
     assert zone_from_label("Zone 2: Aerobic") is ZoneCode.Z2
-    assert zone_from_label("Zone 5B: Aerobic") is ZoneCode.Z5B
+    assert zone_from_label("Zone 5B: Aerobic Capacity") is ZoneCode.Z5B
     assert ZoneCode.Z2 is not ZoneCode.Z5B
 
 
 def test_mapping_is_whitespace_and_case_tolerant() -> None:
-    assert zone_from_label("  zone 5b:   Aerobic  ") is ZoneCode.Z5B
+    assert zone_from_label("  zone 5b:   Aerobic Capacity  ") is ZoneCode.Z5B
+
+
+@pytest.mark.parametrize(
+    ("label", "expected"),
+    [
+        ("Recovery", ZoneCode.Z1),
+        ("Aerobic", ZoneCode.Z2),
+        ("Tempo", ZoneCode.Z3),
+        ("SubThreshold", ZoneCode.Z4),
+        ("SuperThreshold", ZoneCode.Z5A),
+        ("Aerobic Capacity", ZoneCode.Z5B),
+        ("Anaerobic Capacity", ZoneCode.Z5C),
+    ],
+)
+def test_bare_descriptor_resolves_to_its_code(label: str, expected: ZoneCode) -> None:
+    assert zone_from_label(label) is expected
+
+
+def test_ambiguous_zone_label_error_is_kept_defensively() -> None:
+    """No measured label is ambiguous today, so nothing raises this; it stays as
+    the defensive contract for future descriptors."""
+    assert issubclass(AmbiguousZoneLabelError, ZoneError)
 
 
 @pytest.mark.parametrize(
     "label",
-    ["Recovery", "Tempo", "SubThreshold", "SuperThreshold", "Anaerobic"],
+    ["Zone 3: Recovery", "Zone 1: Aerobic", "Zone 5A: Anaerobic", "Zone 2: Capacity"],
 )
-def test_bare_unambiguous_descriptor_is_accepted(label: str) -> None:
-    assert zone_from_label(label) in set(ZoneCode)
-
-
-def test_bare_ambiguous_descriptor_is_rejected() -> None:
-    """Bare `Aerobic` cannot be resolved (Z2 vs Z5B) and must not default silently."""
-    with pytest.raises(AmbiguousZoneLabelError):
-        zone_from_label("Aerobic")
-
-
-@pytest.mark.parametrize("label", ["Zone 3: Recovery", "Zone 1: Aerobic", "Zone 5A: Anaerobic"])
 def test_mismatched_code_descriptor_pair_is_rejected(label: str) -> None:
     with pytest.raises(ZoneLabelMismatchError):
         zone_from_label(label)

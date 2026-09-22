@@ -2,8 +2,11 @@
 
 Structural invariants enforced here (feature doc section 3.1):
 
-- I1: a step target carries a zone code and optional free-text intent; the schema
-  offers no field for absolute bpm or watts and forbids unknown extras.
+- I1: a step target carries no absolute physiological magnitude such as bpm or
+  watts; it is either a zone code plus optional free-text intent, or a 1-10 RPE.
+  RPE is a perceived-exertion scale, not an athlete-specific absolute value, so it
+  does not violate I1. The schema forbids unknown extras, so no bpm/watts field
+  can be smuggled in.
 - I2: zone codes are the closed corpus set defined in ``cycloai.domain.zones``.
 - I5: ``total_duration_s`` and ``estimated_tss`` are computed fields derived from
   the structure; they are not caller-supplied inputs.
@@ -21,6 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validat
 from cycloai.domain.zones import ZoneCode
 
 __all__ = [
+    "CadenceTarget",
     "ClockDuration",
     "CyclingBlock",
     "CyclingStep",
@@ -34,9 +38,11 @@ __all__ = [
     "GymSet",
     "MinutesDuration",
     "PlanWeek",
+    "RpeTarget",
     "SecondsDuration",
     "StepDuration",
     "StepRole",
+    "StepTarget",
     "TrainingPlan",
     "ZoneCode",
     "ZoneTarget",
@@ -110,7 +116,7 @@ StepDuration = Annotated[
 
 
 class ZoneTarget(BaseModel):
-    """Step target: a closed-set zone code plus optional free-text intent (I1).
+    """Zone step target: a closed-set zone code plus optional free-text intent (I1).
 
     Intent annotations observed in the corpus (``APRIETA``, ``A TOPE``, ``NO TIENES
     QUE LLEGAR A ESTE PULSO``) are coach intents, not zones; they live here.
@@ -123,14 +129,74 @@ class ZoneTarget(BaseModel):
     intent: str | None = None
 
 
+class RpeTarget(BaseModel):
+    """RPE step target: a 1-10 perceived-exertion value (corpus ``@ N RPE``).
+
+    RPE does not violate invariant I1: I1 forbids absolute physiological
+    magnitudes that depend on the individual athlete (heart rate in bpm, power in
+    watts). RPE is a bounded subjective scale (1-10), not an athlete-specific
+    absolute value, so it stays prescriptive without smuggling in physiology.
+
+    Corpus facts: every ``@ N RPE`` step carries NO zone label, and every
+    ``@ N bpm`` step carries one; the two forms are mutually exclusive.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["rpe"] = "rpe"
+    rpe: Annotated[float, Field(ge=1, le=10)]
+
+
+StepTarget = Annotated[
+    ZoneTarget | RpeTarget,
+    Field(discriminator="kind"),
+]
+"""Discriminated union of step targets: exactly one of zone or RPE per step.
+
+A step with an RPE target carries no zone, and a zone target carries no RPE:
+``extra="forbid"`` on both sides makes the opposite field a validation error.
+"""
+
+
+class CadenceTarget(BaseModel):
+    """Optional cadence window on a cycling step (corpus ``N-N rpm`` and ``Nrpm``).
+
+    The two corpus cadence forms map faithfully onto one explicit model:
+    ``85-95 rpm`` -> ``min_rpm=85, max_rpm=95``, and a single ``90 rpm`` ->
+    ``min_rpm=max_rpm=90`` (use :meth:`from_single`); the degenerate window
+    keeps the single form without two loose integer fields.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    min_rpm: int = Field(ge=1)
+    max_rpm: int = Field(ge=1)
+
+    @classmethod
+    def from_single(cls, rpm: int) -> CadenceTarget:
+        """Map the corpus single-value form ``Nrpm`` onto ``min == max``."""
+        return cls(min_rpm=rpm, max_rpm=rpm)
+
+    @model_validator(mode="after")
+    def _enforce_order(self) -> CadenceTarget:
+        if self.min_rpm > self.max_rpm:
+            raise ValueError("cadence min_rpm must not exceed max_rpm")
+        return self
+
+
 class CyclingStep(BaseModel):
-    """One step of a cycling session: duration, role and a zone target (I1)."""
+    """One cycling step: duration, role, exactly one target, optional cadence.
+
+    The target is either a :class:`ZoneTarget` (corpus ``@ N bpm`` plus a zone
+    label) or an :class:`RpeTarget` (corpus ``@ N RPE``, never with a zone label).
+    """
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     duration: StepDuration
     role: StepRole
-    target: ZoneTarget
+    target: StepTarget
+    cadence: CadenceTarget | None = None
 
 
 class CyclingBlock(BaseModel):
@@ -213,10 +279,16 @@ class CyclingWorkout(BaseModel):
     @computed_field
     @property
     def estimated_tss(self) -> float:
-        """Derived TSS estimate from zone durations (I5); 0.0 for free-text sessions."""
+        """Derived TSS estimate from zone durations (I5); 0.0 for free-text sessions.
+
+        RPE-targeted steps contribute duration but no TSS: the TSS/hour midpoints
+        are keyed on zone codes and the corpus defines no zone for RPE steps.
+        """
         zone_seconds: dict[ZoneCode, int] = {}
         for block in self.blocks:
             for step in block.steps:
+                if not isinstance(step.target, ZoneTarget):
+                    continue
                 code = step.target.zone
                 step_seconds = step.duration.total_seconds * block.repeat_count
                 zone_seconds[code] = zone_seconds.get(code, 0) + step_seconds

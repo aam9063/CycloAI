@@ -14,9 +14,21 @@ It is a subset refinement of the Coggan model documented in
 The KB document does NOT define Z5A/Z5B/Z5C sub-zone bounds; they are deliberately
 left absent instead of being guessed (feature doc invariant I2 and decision D7).
 
-The corpus label text is NOT unique: ``Zone 2: Aerobic`` and ``Zone 5B: Aerobic``
-share the descriptor ``Aerobic``. Mapping is therefore keyed on the parsed zone
-code token and the descriptor is only validated against it, never used as a key.
+Measured corpus labels (complete text, with observed frequencies):
+
+    Zone 1: Recovery             (140)
+    Zone 2: Aerobic              (73)
+    Zone 3: Tempo                (32)
+    Zone 4: SubThreshold         (20)
+    Zone 5A: SuperThreshold      (24)
+    Zone 5B: Aerobic Capacity    (24)
+    Zone 5C: Anaerobic Capacity  (16)
+
+There is no duplicate label: ``Aerobic`` (Z2) and ``Aerobic Capacity`` (Z5B) are
+different strings and no measured label is genuinely ambiguous. An earlier
+measurement truncated each label at the first space (rendering ``Zone 5B: Aerobic
+Capacity`` as ``Zone 5B: Aerobic``), which invented a false collision with Z2 and
+seeded wrong descriptors into this module; mapping now uses the full label text.
 """
 
 from __future__ import annotations
@@ -47,7 +59,11 @@ class UnknownZoneCodeError(ZoneError):
 
 
 class AmbiguousZoneLabelError(ZoneError):
-    """Raised when a bare descriptor maps to more than one zone code."""
+    """Raised when a bare descriptor maps to more than one zone code.
+
+    Defensive: every measured corpus descriptor is unambiguous today, so nothing
+    in the corpus path raises this; it remains the contract for future labels.
+    """
 
 
 class ZoneLabelMismatchError(ZoneError):
@@ -74,8 +90,8 @@ ZONES: dict[ZoneCode, ZoneSpec] = {
     ZoneCode.Z3: ZoneSpec(ZoneCode.Z3, "Tempo", 76.0, 90.0),
     ZoneCode.Z4: ZoneSpec(ZoneCode.Z4, "SubThreshold", 91.0, 105.0),
     ZoneCode.Z5A: ZoneSpec(ZoneCode.Z5A, "SuperThreshold", None, None),
-    ZoneCode.Z5B: ZoneSpec(ZoneCode.Z5B, "Aerobic", None, None),
-    ZoneCode.Z5C: ZoneSpec(ZoneCode.Z5C, "Anaerobic", None, None),
+    ZoneCode.Z5B: ZoneSpec(ZoneCode.Z5B, "Aerobic Capacity", None, None),
+    ZoneCode.Z5C: ZoneSpec(ZoneCode.Z5C, "Anaerobic Capacity", None, None),
 }
 
 # Corpus-observed code/descriptor pairs. The descriptor is a display label only.
@@ -85,8 +101,8 @@ _KNOWN_PAIRS: dict[str, ZoneCode] = {
     "3:tempo": ZoneCode.Z3,
     "4:subthreshold": ZoneCode.Z4,
     "5a:superthreshold": ZoneCode.Z5A,
-    "5b:aerobic": ZoneCode.Z5B,
-    "5c:anaerobic": ZoneCode.Z5C,
+    "5b:aerobic capacity": ZoneCode.Z5B,
+    "5c:anaerobic capacity": ZoneCode.Z5C,
 }
 
 _CODE_TOKENS: dict[str, ZoneCode] = {
@@ -99,13 +115,16 @@ _CODE_TOKENS: dict[str, ZoneCode] = {
     "5C": ZoneCode.Z5C,
 }
 
-# Bare-descriptor form: only unambiguous descriptors can be resolved without a code.
+# Bare-descriptor form: every measured descriptor is unambiguous, so each one
+# maps to exactly one code.
 _UNAMBIGUOUS_DESCRIPTORS: dict[str, ZoneCode] = {
     "recovery": ZoneCode.Z1,
+    "aerobic": ZoneCode.Z2,
     "tempo": ZoneCode.Z3,
     "subthreshold": ZoneCode.Z4,
     "superthreshold": ZoneCode.Z5A,
-    "anaerobic": ZoneCode.Z5C,
+    "aerobic capacity": ZoneCode.Z5B,
+    "anaerobic capacity": ZoneCode.Z5C,
 }
 
 _ZONE_LABEL_RE = re.compile(r"^Zone\s*([0-9][A-C]?)\s*:\s*(.+)$", re.IGNORECASE)
@@ -115,9 +134,13 @@ def zone_from_label(label: str) -> ZoneCode:
     """Map a corpus zone label onto the closed zone vocabulary.
 
     Accepts the corpus form ``Zone 1: Recovery`` (keyed on the code token ``1``) and
-    the bare unambiguous descriptor ``Recovery``. A bare descriptor shared by several
-    codes (``Aerobic``: Z2 and Z5B) is ambiguous and rejected. Unmapped or unknown
-    labels raise a dedicated :class:`ZoneError` subclass; nothing is guessed.
+    the bare descriptor form. Every measured descriptor is unambiguous, so a bare
+    ``Aerobic`` resolves to Z2 and ``Aerobic Capacity`` to Z5B. A code/descriptor
+    pair that is not one of the seven measured pairs is rejected. Unmapped or
+    unknown labels raise a dedicated :class:`ZoneError` subclass; nothing is guessed.
+
+    :class:`AmbiguousZoneLabelError` stays defined for defensive use; no measured
+    corpus label raises it today.
     """
     text = " ".join(label.split())
     if not text:
@@ -140,10 +163,5 @@ def zone_from_label(label: str) -> ZoneCode:
 
     zone = _UNAMBIGUOUS_DESCRIPTORS.get(text.casefold())
     if zone is None:
-        if text.casefold() in {"aerobic"}:
-            raise AmbiguousZoneLabelError(
-                f"Ambiguous bare zone label {label!r}: matches Z2 and Z5B; "
-                "use the 'Zone N: ...' form"
-            )
         raise UnknownZoneCodeError(f"Unknown corpus zone label: {label!r}")
     return zone
