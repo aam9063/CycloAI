@@ -1,0 +1,31 @@
+# CycloAI development database.
+#
+# The credentials below are DEVELOPMENT-ONLY: they exist so `docker compose up`
+# gives every contributor an identical, working PostgreSQL with pgvector.
+# Production credentials are injected by the deployment environment and must
+# never be committed here.
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cycloai-postgres
+    environment:
+      POSTGRES_USER: cycloai
+      POSTGRES_PASSWORD: cycloai-dev
+      # The database is deliberately named to look disposable: the integration
+      # suite (backend/tests/test_db_integration.py) drops the public and
+      # extensions schemas, and its fail-closed guard refuses any database
+      # whose name does not contain 'test' or 'dev'.
+      POSTGRES_DB: cycloai_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - cycloai-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cycloai -d cycloai_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+
+volumes:
+  cycloai-pgdata:
