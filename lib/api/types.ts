@@ -39,9 +39,11 @@ export interface DetailAck {
 
 export type TrainingSystem = "power" | "heart_rate";
 
-/** The caller's own profile: exactly the `profiles` columns. */
+/** The caller's own profile: the `profiles` columns plus their email. */
 export interface Profile {
   id: string;
+  /** The account email, joined from `users` — the only non-`profiles` field. */
+  email: string;
   created_at: string;
   updated_at: string;
   display_name: string | null;

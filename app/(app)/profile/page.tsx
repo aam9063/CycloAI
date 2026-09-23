@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { ApiError, serverGet } from "@/lib/api/server";
+import type { Profile } from "@/lib/api/types";
 import InitialsAvatar from "@/components/profile/InitialsAvatar";
 import ProfileForm from "@/components/profile/ProfileForm";
 import StravaConnect from "@/components/profile/StravaConnect";
@@ -11,24 +12,18 @@ export const metadata: Metadata = {
 };
 
 export default async function ProfilePage() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  // Middleware also guards this route, but defensive check is correct.
-  if (!user) {
-    redirect("/login");
+  let profile: Profile;
+  try {
+    profile = await serverGet<Profile>("/profile");
+  } catch (err) {
+    // Middleware also guards this route, but an absent/expired session here
+    // arrives as a 401 from the backend; it must become the same /login
+    // redirect as before, not an unhandled 500.
+    if (err instanceof ApiError && err.status === 401) {
+      redirect("/login");
+    }
+    throw err;
   }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "id,display_name,strava_connected,strava_connected_at"
-    )
-    .eq("id", user.id)
-    .single();
 
   return (
     <div className="mx-auto w-full max-w-[640px] px-6 py-10 flex flex-col gap-6">
@@ -47,17 +42,15 @@ export default async function ProfilePage() {
         </h2>
 
         <div className="flex items-center gap-4">
-          <InitialsAvatar
-            name={profile?.display_name ?? user.email ?? null}
-          />
+          <InitialsAvatar name={profile.display_name ?? profile.email} />
           <span className="text-[15px] text-ink-mute">
-            {profile?.display_name ?? user.email ?? ""}
+            {profile.display_name ?? profile.email}
           </span>
         </div>
 
         <ProfileForm
-          initialName={profile?.display_name ?? null}
-          email={user.email ?? ""}
+          initialName={profile.display_name ?? null}
+          email={profile.email}
         />
       </section>
 
@@ -74,8 +67,8 @@ export default async function ProfilePage() {
         </h2>
 
         <StravaConnect
-          connected={profile?.strava_connected ?? false}
-          connectedAt={profile?.strava_connected_at ?? null}
+          connected={profile.strava_connected}
+          connectedAt={profile.strava_connected_at ?? null}
         />
       </section>
 

@@ -1,6 +1,8 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
+import { ApiError, serverPatch } from "@/lib/api/server";
+import type { Profile } from "@/lib/api/types";
 
 export type ActionResult = {
   error: string | null;
@@ -11,25 +13,18 @@ export type ActionResult = {
  * Updates the authenticated user's display_name.
  *
  * Security posture:
- * - Auth gate first: getUser() must return a valid user before any DB write.
- * - Whitelist: ONLY display_name is written. No other field from the payload is touched.
- * - Scoped write: WHERE id = user.id — no cross-user writes possible.
+ * - Auth gate: the backend enforces the session on PATCH /profile; a 401
+ *   (session ended between load and submit) redirects to /login instead of
+ *   surfacing as a generic failure.
+ * - Whitelist: ONLY display_name is sent in the payload. No other field is
+ *   included, and no `id` — the backend derives the target profile from the
+ *   authenticated caller, so an id in the body could never select a row.
  * - Email is NEVER written by this action.
  */
 export async function updateDisplayName(
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  // Auth gate — must be first
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "No autenticado" };
-  }
-
   const raw = formData.get("display_name");
   const display_name = String(raw ?? "").trim();
 
@@ -41,12 +36,12 @@ export async function updateDisplayName(
     return { error: "El nombre no puede superar 100 caracteres." };
   }
 
-  const { error: dbError } = await supabase
-    .from("profiles")
-    .update({ display_name })
-    .eq("id", user.id);
-
-  if (dbError) {
+  try {
+    await serverPatch<Profile>("/profile", { display_name });
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      redirect("/login");
+    }
     return { error: "Error al guardar. Intenta de nuevo." };
   }
 
