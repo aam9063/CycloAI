@@ -1,70 +1,56 @@
 import 'server-only';
 
-import type { SupabaseClient } from '@supabase/supabase-js';
-import type { MessageRow } from '@/lib/ai/types';
+import { serverGet, serverPost } from '@/lib/api/server';
+import type { Message, MessageCreate } from '@/lib/api/types';
 
-/** Persists the user's turn BEFORE the stream starts (durability on stream failure). */
-export async function insertUserMessage(
-  supabase: SupabaseClient,
-  {
-    conversationId,
-    userId,
-    content,
-  }: { conversationId: string; userId: string; content: string },
-): Promise<void> {
-  await supabase.from('messages').insert({
-    conversation_id: conversationId,
-    user_id: userId,
-    role: 'user',
-    content,
-  });
+/**
+ * Returns the signed-in athlete's messages for one conversation, oldest
+ * first (backend ordering). Unlike the old Supabase helper there is no
+ * `limit` parameter — the backend returns every message; callers cap the
+ * window themselves (e.g. `.slice(-20)`) if they need the old behaviour.
+ * Errors (including 401 and the 404 for an invisible conversation) propagate.
+ */
+export function getConversationHistory(
+  conversationId: string,
+): Promise<Message[]> {
+  return serverGet<Message[]>(`/conversations/${conversationId}/messages`);
 }
 
 /**
- * Persists the assistant's turn in onFinish.
- * Guards against empty content: substitutes '[respuesta interrumpida]' if text is empty.
+ * Appends one message to the signed-in athlete's conversation and returns
+ * the stored row. Unlike the old Supabase helpers, failures THROW — nothing
+ * is swallowed. Callers decide whether that aborts the turn (route handler)
+ * or is logged (stream callbacks).
  */
-export async function insertAssistantMessage(
-  supabase: SupabaseClient,
-  {
-    conversationId,
-    userId,
-    content,
-    metadata,
-  }: {
-    conversationId: string;
-    userId: string;
-    content: string;
-    metadata?: Record<string, unknown> | null;
-  },
-): Promise<void> {
+export function appendMessage(
+  conversationId: string,
+  message: MessageCreate,
+): Promise<Message> {
+  return serverPost<Message>(`/conversations/${conversationId}/messages`, message);
+}
+
+/** Appends the user's turn. */
+export function appendUserMessage(
+  conversationId: string,
+  content: string,
+): Promise<Message> {
+  return appendMessage(conversationId, { role: 'user', content });
+}
+
+/**
+ * Appends the assistant's turn. Guards against empty content — the backend
+ * rejects empty messages (422), so a blank stream result is stored as an
+ * explicit interrupted-answer marker, exactly like the old helper did.
+ */
+export function appendAssistantMessage(
+  conversationId: string,
+  content: string,
+  metadata?: Record<string, unknown> | null,
+): Promise<Message> {
   const safeContent = content.trim() || '[respuesta interrumpida]';
-  await supabase.from('messages').insert({
-    conversation_id: conversationId,
-    user_id: userId,
+  return appendMessage(conversationId, {
     role: 'assistant',
     content: safeContent,
     metadata: metadata ?? null,
   });
-}
-
-/**
- * Returns the last `limit` messages for a conversation in chronological order.
- * Used to seed the model's context window and the UI's initialMessages.
- */
-export async function getConversationHistory(
-  supabase: SupabaseClient,
-  conversationId: string,
-  limit: number,
-): Promise<MessageRow[]> {
-  // Fetch most-recent N, then reverse to chronological order for the model.
-  const { data, error } = await supabase
-    .from('messages')
-    .select('*')
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-
-  if (error || !data) return [];
-  return (data as MessageRow[]).reverse();
 }

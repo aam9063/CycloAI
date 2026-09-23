@@ -5,8 +5,9 @@ import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { createClient } from '@/lib/supabase/server';
 import { buildSystemPrompt } from '@/lib/ai/system-prompt';
 import { searchKnowledgeBase } from '@/lib/ai/rag';
-import { getUserProfile, getOrCreateConversation, touchConversation } from '@/lib/db/conversations';
-import { insertUserMessage, insertAssistantMessage } from '@/lib/db/messages';
+import { getUserProfile, createConversation, getConversation } from '@/lib/db/conversations';
+import { appendUserMessage, appendAssistantMessage } from '@/lib/db/messages';
+import { ApiError } from '@/lib/api/server';
 import { getClientIp, checkRateLimit } from '@/lib/utils/ratelimit';
 import { uiMessageText } from '@/lib/chat/text';
 
@@ -54,7 +55,9 @@ export async function POST(req: Request) {
     return new Response('Perfil no encontrado', { status: 500 });
   }
 
-  // 5. Resolve conversation (create or verify ownership)
+  // 5. Resolve conversation (verify ownership via the backend, or create one).
+  // The backend enforces ownership itself: a missing id and a foreign id are
+  // the same generic 404, so both map to this single 404 response.
   const lastUserMessage = messages[messages.length - 1];
   const lastText = uiMessageText(lastUserMessage);
 
@@ -65,20 +68,35 @@ export async function POST(req: Request) {
 
   let convId: string;
   try {
-    convId = await getOrCreateConversation(supabase, user.id, conversationId, lastText);
+    if (conversationId) {
+      const conversation = await getConversation(conversationId);
+      if (!conversation) {
+        return new Response('Conversación no encontrada', { status: 404 });
+      }
+      convId = conversation.id;
+    } else {
+      // The backend truncates the title to 60 chars on a word boundary,
+      // exactly like the old client-side truncateTitle.
+      const created = await createConversation(lastText);
+      convId = created.id;
+    }
   } catch (err) {
-    const msg = err instanceof Error ? err.message : '';
-    if (msg === 'forbidden') return new Response('Acceso denegado', { status: 403 });
-    if (msg === 'not_found') return new Response('Conversación no encontrada', { status: 404 });
-    return new Response('Error interno', { status: 500 });
+    if (err instanceof ApiError && err.status === 401) {
+      return new Response('No autorizado', { status: 401 });
+    }
+    throw err;
   }
 
-  // 6. Persist user message BEFORE streaming (durability if stream fails)
-  await insertUserMessage(supabase, {
-    conversationId: convId,
-    userId: user.id,
-    content: lastText,
-  });
+  // 6. Persist user message BEFORE streaming (durability if stream fails).
+  // Unlike the old Supabase insert (errors swallowed), a failed save now fails
+  // the request loudly — the client sees an error instead of silently losing
+  // the turn from history.
+  try {
+    await appendUserMessage(convId, lastText);
+  } catch (err) {
+    console.error('[chat] failed to persist user message:', err);
+    return new Response('Error interno', { status: 500 });
+  }
 
   // 7. Retrieve RAG context then build system prompt.
   // searchKnowledgeBase returns '' on any failure — RAG is additive, never blocking.
@@ -155,15 +173,16 @@ export async function POST(req: Request) {
         // W-1 fix: if onAbort already persisted a row, skip this insert.
         if (persistedByAbort) return;
         const isAborted = finishReason !== 'stop' && finishReason !== 'length';
-        await insertAssistantMessage(supabase, {
-          conversationId: convId,
-          userId: user.id,
-          content: text,
-          // Always persist finishReason: 'length' cuts and provider anomalies
-          // are diagnosable from the DB without reproducing.
-          metadata: isAborted ? { aborted: true, finishReason } : { finishReason },
-        });
-        await touchConversation(supabase, convId);
+        // Append bumps updated_at server-side, so the old touchConversation call
+        // is gone. A failed save is logged, not swallowed silently, and cannot
+        // crash the stream response this late.
+        try {
+          await appendAssistantMessage(convId, text, isAborted
+            ? { aborted: true, finishReason }
+            : { finishReason });
+        } catch (err) {
+          console.error('[chat] failed to persist assistant message:', err);
+        }
       },
       onAbort: async ({ steps }) => {
         // Fires when abortSignal fires (user stop / client disconnect) mid-stream.
@@ -172,13 +191,13 @@ export async function POST(req: Request) {
           .map((s) => s.text ?? '')
           .join('');
         persistedByAbort = true; // W-1: signal onFinish to skip its insert
-        await insertAssistantMessage(supabase, {
-          conversationId: convId,
-          userId: user.id,
-          content: partial,
-          metadata: { aborted: true }, // SG-1: spec says { aborted: true }
-        });
-        await touchConversation(supabase, convId);
+        // Append bumps updated_at server-side, so the old touchConversation call
+        // is gone. A failed save is logged, not swallowed silently.
+        try {
+          await appendAssistantMessage(convId, partial, { aborted: true }); // SG-1: spec says { aborted: true }
+        } catch (err) {
+          console.error('[chat] failed to persist aborted assistant message:', err);
+        }
       },
     });
   } catch (err) {
