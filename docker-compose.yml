@@ -1,7 +1,10 @@
 # CycloAI development database.
 #
-# The credentials below are DEVELOPMENT-ONLY: they exist so `docker compose up`
-# gives every contributor an identical, working PostgreSQL with pgvector.
+# The credentials below are DEVELOPMENT-ONLY: they are supplied by the
+# environment (a `.env` file next to this compose file, which is ignored by
+# git and never committed) so `docker compose up` gives every contributor an
+# identical, working PostgreSQL with pgvector. Compose fails loudly if the
+# password is not set, so the stack can never start with a hardcoded value.
 # Production credentials are injected by the deployment environment and must
 # never be committed here.
 services:
@@ -10,7 +13,7 @@ services:
     container_name: cycloai-postgres
     environment:
       POSTGRES_USER: cycloai
-      POSTGRES_PASSWORD: cycloai-dev
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is not set - copy .env.example to .env and set a value (generate one with: openssl rand -base64 24)}"
       # The database is deliberately named to look disposable: the integration
       # suite (backend/tests/test_db_integration.py) drops the public and
       # extensions schemas, and its fail-closed guard refuses any database
