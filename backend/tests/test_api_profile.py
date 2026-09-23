@@ -17,7 +17,7 @@ Contract under test:
 Ownership: every request must bind the caller derived from the token onto
 the session (``bind_session_user``) before touching the repository, and no
 body field may select which profile is read or written. An id smuggled into
-a body is ignored.
+a body is REJECTED like any other unknown field (``extra="forbid"``).
 """
 
 from __future__ import annotations
@@ -217,6 +217,8 @@ def test_patch_applies_allowed_field(monkeypatch: pytest.MonkeyPatch) -> None:
     assert response.json()["display_name"] == "Racer"
     assert repo.updates == [{"display_name": "Racer"}]
     assert repo.calls[0][1] == CALLER_ID
+    # The ownership guard ran with the token identity before the write.
+    assert client.app.state.bound_callers == [CALLER_ID]  # type: ignore[attr-defined]
 
 
 def test_patch_rejects_disallowed_field_with_clear_status(
@@ -243,8 +245,9 @@ def test_patch_rejects_unknown_training_system(monkeypatch: pytest.MonkeyPatch) 
     assert repo.updates == []
 
 
-def test_identity_comes_only_from_token_not_body(monkeypatch: pytest.MonkeyPatch) -> None:
-    """An id smuggled into the body must not select the profile."""
+def test_patch_rejects_id_field_in_body(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An id smuggled into the body is REJECTED like any other unknown field:
+    a client must never see a silent 200 that ignored what it sent."""
     repo = FakeProfileRepository(profile=FakeProfile(id=CALLER_ID))
     client = make_client(monkeypatch, repo)
 
@@ -252,9 +255,26 @@ def test_identity_comes_only_from_token_not_body(monkeypatch: pytest.MonkeyPatch
         "/profile", json={"id": str(OTHER_ID), "display_name": "Racer"}
     )
 
+    assert response.status_code == 422
+    assert "id" in response.text
+    # Nothing was read or written: the request never reached the repository.
+    assert repo.calls == []
+    assert repo.updates == []
+
+
+def test_patch_acts_only_on_token_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The security property behind the old ignore rule, asserted on a request
+    that smuggles nothing: the profile acted on is the one from the TOKEN."""
+    repo = FakeProfileRepository(profile=FakeProfile(id=CALLER_ID))
+    client = make_client(monkeypatch, repo)
+
+    response = client.patch("/profile", json={"display_name": "Racer"})
+
     assert response.status_code == 200
     assert response.json()["id"] == str(CALLER_ID)
     assert repo.calls == [("update", CALLER_ID)]
+    assert repo.updates == [{"display_name": "Racer"}]
+    # The ownership guard ran with the token identity before the write.
     assert client.app.state.bound_callers == [CALLER_ID]  # type: ignore[attr-defined]
 
 

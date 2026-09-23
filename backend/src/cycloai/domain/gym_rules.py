@@ -31,6 +31,16 @@ sources:
   excluding the structural (non-exercise) headings listed explicitly in
   ``_STRUCTURAL_KB_HEADINGS``. The exclusion list is documented and
   exhaustive on purpose: no silent filtering.
+- the SHORT FORMS of those headings, derived by :func:`heading_short_forms`
+  under documented mechanical rules (strip a parenthetical suffix, drop a
+  trailing ``y sus variaciones``, expand a standalone `` o `` alternative).
+  Measured fact motivating this: generated plans name exercises with the
+  bare short form (``Pallof press``), not the full heading (``Pallof Press
+  (anti-rotación)``), so indexing only the verbatim heading produced a
+  FALSE ``unknown_exercise_name`` warning — the gym side's
+  anti-hallucination signal eroded by exactly the legitimate content it
+  exists to protect. Invented names still warn: derivation only ever
+  SHORTENS a real heading, it never invents words.
 
 Alias map
 ---------
@@ -67,6 +77,7 @@ __all__ = [
     "Finding",
     "GymValidationReport",
     "Severity",
+    "heading_short_forms",
     "normalize_name",
     "validate_gym_blocks",
 ]
@@ -207,6 +218,73 @@ class ExerciseVocabulary:
         return isinstance(name, str) and self.contains(name)
 
 
+def heading_short_forms(heading: str) -> list[str]:
+    """Derive the safe short forms of a knowledge-base exercise heading.
+
+    The rules are deliberately mechanical so a reader can predict the output
+    exactly. They are applied IN ORDER, each rule seeing the output of the
+    previous one:
+
+    R1. If the heading ends with a parenthesized suffix `` (…)`` (a space,
+        then ``(``…``)`` with no nested parentheses), strip that suffix:
+        ``Pallof Press (anti-rotación)`` -> ``Pallof Press``;
+        ``Zancada búlgara (split squat búlgara)`` -> ``Zancada búlgara``.
+    R2. If the result ends with ``y sus variaciones`` (compared
+        case-insensitively), drop that trailing phrase:
+        ``Plancha frontal y sus variaciones`` -> ``Plancha frontal``.
+    R3. If the result contains a standalone `` o `` (Spanish "or"), the text
+        before the FIRST `` o `` is a shared head plus its last word being
+        the first alternative, and the text after it is a further
+        `` o ``-separated list of alternatives. Emit the head with its last
+        word replaced by EACH alternative:
+        ``Peso muerto convencional o rumano`` -> ``Peso muerto
+        convencional`` and ``Peso muerto rumano``.
+    R4. Any candidate that, after the same normalization W1 uses
+        (:func:`normalize_name`), is empty or a single character is
+        SKIPPED, and so is any candidate equal to the full heading — the
+        derivation never fabricates a degenerate or duplicate key.
+
+    Returns the derived short forms (empty when no rule applies). The FULL
+    heading itself is indexed separately; this function only shortens.
+    """
+    text = heading.strip()
+
+    # R1: strip a trailing parenthetical suffix (" (…)").
+    if text.endswith(")"):
+        open_index = text.rfind(" (")
+        if open_index > 0 and text[open_index + 2 : -1].find("(") == -1:
+            text = text[:open_index].strip()
+
+    # R2: drop a trailing "y sus variaciones".
+    suffix = "y sus variaciones"
+    if text.casefold().endswith(suffix) and len(text) > len(suffix):
+        text = text[: -len(suffix)].strip()
+
+    # R3: expand a standalone " o " alternative list (first " o " only).
+    candidates: list[str]
+    head, separator, rest = text.partition(" o ")
+    head_words = head.split()
+    if not separator or not head_words:
+        candidates = [text]
+    else:
+        alternatives = [head_words[-1], *(part.strip() for part in rest.split(" o "))]
+        candidates = [
+            " ".join([*head_words[:-1], alternative])
+            for alternative in alternatives
+            if alternative
+        ]
+
+    # R4: skip empty, one-character, or duplicate-of-heading candidates.
+    forms: list[str] = []
+    for candidate in candidates:
+        if not candidate or len(normalize_name(candidate)) <= 1:
+            continue
+        if candidate == heading.strip() or candidate in forms:
+            continue
+        forms.append(candidate)
+    return forms
+
+
 def _find_repo_root() -> Path:
     """Locate the repository root by walking up from this module until the
     corpus file (``docs/<CORPUS_FILENAME>``) is found."""
@@ -243,6 +321,11 @@ def _default_vocabulary() -> ExerciseVocabulary:
         for exercise in (*block.activation, *block.exercises, *block.core)
     ]
     names.extend(_kb_exercise_headings(root))
+    # Short forms of the KB headings are members too: generated plans use the
+    # bare short form, and a false W1 there erodes the anti-hallucination
+    # signal (see heading_short_forms for the documented derivation rules).
+    for heading in _kb_exercise_headings(root):
+        names.extend(heading_short_forms(heading))
     # Alias targets are canonical corrected forms and must be members too,
     # otherwise folding a corpus typo would map onto a name that fails W1.
     names.extend(_ALIAS_MAP.values())

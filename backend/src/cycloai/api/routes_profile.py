@@ -126,10 +126,12 @@ class ProfileUpdate(BaseModel):
 
     ``extra="forbid"`` turns a typo or a smuggled field into a clear 422 at
     the boundary, instead of relying on the repository's later rejection.
-    The one deliberate exception is ``id``: it is ACCEPTED and IGNORED —
-    identity comes only from the verified token, so an id in the body can
-    never select which profile is written, and the request proceeds with the
-    caller's own profile rather than failing on a field that cannot matter.
+    That includes ``id``: identity comes only from the verified token, so an
+    id in the body can never select which profile is written — and since it
+    could not be honoured anyway, it is REJECTED like any other unknown
+    field rather than accepted and silently ignored. A client that sends
+    something that will not be applied sees the same clear rejection as any
+    other unknown field, instead of a 200 that hides a no-op.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -146,9 +148,6 @@ class ProfileUpdate(BaseModel):
     training_system: Literal["power", "heart_rate"] | None = None
     lthr_bpm: int | None = Field(default=None, ge=1, le=400)
     ftp_estimated: int | None = Field(default=None, ge=1, le=1000)
-    # Accepted but never applied: excluded from the dumped payload so no body
-    # value can influence which profile is written. Identity is token-only.
-    id: uuid.UUID | None = Field(default=None, exclude=True)
 
 
 def _missing_profile() -> HTTPException:

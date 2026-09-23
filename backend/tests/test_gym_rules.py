@@ -34,6 +34,7 @@ from cycloai.domain.gym_rules import (
     ExerciseVocabulary,
     GymValidationReport,
     Severity,
+    heading_short_forms,
     normalize_name,
     validate_gym_blocks,
 )
@@ -176,6 +177,74 @@ def test_normalization_folds_case_accents_and_whitespace() -> None:
     assert normalize_name("  CAMINATA   Lateral  ÁÉÍÓÚ ") == "caminata lateral aeiou"
     assert normalize_name("Abducción de CADERA") == "abduccion de cadera"
     assert normalize_name("crunch\tde\nabdomen") == "crunch de abdomen"
+
+
+#: (full knowledge-base heading, bare short form a generated plan uses).
+#: The full headings are quoted VERBATIM from knowledge-base/gym/.
+KB_SHORT_FORM_CASES = [
+    ("Pallof Press (anti-rotación)", "Pallof press"),
+    ("Plancha frontal y sus variaciones", "Plancha frontal"),
+    ("Zancada búlgara (split squat búlgaro)", "Zancada búlgara"),
+    ("Peso muerto convencional o rumano", "Peso muerto rumano"),
+]
+
+
+def test_kb_heading_short_forms_are_in_the_vocabulary(
+    vocabulary: ExerciseVocabulary,
+) -> None:
+    """A generated exercise named with the BARE short form of a knowledge-base
+    heading must resolve, not warn W1."""
+    for full_heading, short_form in KB_SHORT_FORM_CASES:
+        assert vocabulary.contains(full_heading), full_heading
+        assert vocabulary.contains(short_form), short_form
+
+
+def test_generated_short_form_no_longer_warns_w1(
+    vocabulary: ExerciseVocabulary,
+) -> None:
+    block = _make_block(_exercise("Pallof press", GymSet(reps=10)))
+    report = validate_gym_blocks([block], vocabulary=vocabulary)
+    assert report.errors == []
+    assert "unknown_exercise_name" not in _warning_codes(report)
+
+
+def test_full_kb_headings_still_resolve(vocabulary: ExerciseVocabulary) -> None:
+    for full_heading, _ in KB_SHORT_FORM_CASES:
+        assert vocabulary.contains(full_heading), full_heading
+
+
+def test_derivation_rules_are_documented_and_predictable() -> None:
+    """The derivation is mechanical; a reader can predict each output exactly."""
+    assert heading_short_forms("Pallof Press (anti-rotación)") == ["Pallof Press"]
+    assert heading_short_forms("Plancha frontal y sus variaciones") == ["Plancha frontal"]
+    assert heading_short_forms("Zancada búlgara (split squat búlgaro)") == [
+        "Zancada búlgara"
+    ]
+    assert heading_short_forms("Peso muerto convencional o rumano") == [
+        "Peso muerto convencional",
+        "Peso muerto rumano",
+    ]
+    # No rule applies: no short form is fabricated.
+    assert heading_short_forms("Press banca") == []
+
+
+def test_derivation_skips_empty_or_one_character_keys() -> None:
+    """A rule that would produce an empty or one-character key adds nothing."""
+    # A heading that is ONLY a parenthetical: stripping it yields nothing.
+    assert heading_short_forms("(anti-rotación)") == []
+    # One-word head and one-word alternative: both single characters are skipped.
+    assert heading_short_forms("A o B") == []
+    # A two-character alternative survives; a one-character one does not.
+    assert heading_short_forms("Press o I") == ["Press"]
+
+
+def test_derived_short_form_does_not_shadow_a_distinct_corpus_name(
+    vocabulary: ExerciseVocabulary,
+) -> None:
+    """Sanity: every corpus name still resolves through its own entry, and the
+    derived keys never removed anything (membership is additive only)."""
+    for name in ("Press banca", "Prensa", "crunch abdomen"):
+        assert vocabulary.contains(name), name
 
 
 # --- Error rules (E1-E6), built in memory ------------------------------------
