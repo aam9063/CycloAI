@@ -11,6 +11,47 @@ uv run pytest      # run the test suite
 uv run ruff check  # lint
 ```
 
+## Setup
+
+The backend reads its environment **from `backend/.env`**, resolved from this module's
+location rather than from the working directory. Note that this is a DIFFERENT file from
+the repository-root `.env` that the Next.js app uses, and **nothing is inherited between
+them** — a value present in one is not visible to the other.
+
+### 1. Database
+
+```bash
+docker compose up -d          # from the repository root
+cd backend && uv run alembic upgrade head
+```
+
+The schema needs the `vector` extension, so the Postgres image **must include pgvector**:
+the compose file uses `pgvector/pgvector:pg16`. A plain `postgres` image fails at
+`create extension vector`.
+
+### 2. `backend/.env`
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | Must use the asyncpg driver form: `postgresql+asyncpg://user:password@host:port/dbname`. The compose credentials are development-only. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | yes for RAG and generation | Used to embed knowledge on ingestion, to embed queries on retrieval, and by the generator. Ingestion and retrieval fail with a clear message naming this variable when it is missing. |
+| `JWT_SECRET` | yes for auth | There is deliberately **no insecure default**: a development default that works would reach production as forgeable sessions. Generate one with `python -c "import secrets;print(secrets.token_urlsafe(48))"`. Rejected below 32 bytes, because an HMAC-SHA-256 key must be at least as long as the hash output. |
+| `GEMINI_GENERATION_MODEL` | no | Defaults to `gemini-2.5-flash`. Note the frontend configures its own model through `GEMINI_CHAT_MODEL`, so the two are set separately. |
+
+`backend/.env` is git-ignored. Start from `backend/.env.example` for the URL shape, and
+create the file with real values locally — never commit it.
+
+### 3. Verifying it works
+
+```bash
+uv run pytest                                    # unit tests, no database required
+DATABASE_URL=... uv run pytest                   # adds the database integration tests
+CYCLOAI_LIVE_SMOKE=1 uv run pytest tests/test_api_live_smoke.py -s
+```
+
+The last one is opt-in and deliberately skipped by default: it makes a **real** call to
+the model API, so a plain test run must never spend quota.
+
 ## Layout
 
 ```
