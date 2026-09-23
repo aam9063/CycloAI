@@ -49,7 +49,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from cycloai.db.models import Conversation, Message, Profile
+from cycloai.db.models import Conversation, Message, Profile, User
 
 _SESSION_USER_KEY = "cycloai.authenticated_user_id"
 
@@ -188,6 +188,26 @@ def _caller_matches(session: AsyncSession, user_id: uuid.UUID) -> bool:
 
 class ProfileRepository:
     """Access to the caller's own profile row. Never anyone else's."""
+
+    async def get_email(
+        self, session: AsyncSession, user_id: uuid.UUID
+    ) -> str | None:
+        """Return the caller's own account email, or ``None`` if not visible.
+
+        The email lives on ``users``, not ``profiles``, so this is the one
+        owner-scoped accessor for it. Like every method here it takes the
+        ``user_id`` as a required parameter and filters by it, guarded by the
+        same fail-closed caller check: a session bound to another caller gets
+        ``None`` (collapsed into "not found", indistinguishable from a
+        missing user), so no call path can ever read a different account's
+        email. Only the email column is selected — never the full user row —
+        so ``password_hash`` has no path out of this method.
+        """
+        if not _caller_matches(session, user_id):
+            return None
+        return (
+            await session.scalars(select(User.email).where(User.id == user_id))
+        ).first()
 
     async def get_profile(
         self, session: AsyncSession, user_id: uuid.UUID

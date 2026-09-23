@@ -14,6 +14,11 @@ Contract under test:
   product-required fields are present, and the refusal NAMES the missing
   field(s).
 
+The response deliberately includes the caller's own account ``email``: it is
+read through the owner-scoped repository method, so it can only ever be the
+token identity's email. Nothing else from ``users`` (``password_hash``, ...)
+may appear.
+
 Ownership: every request must bind the caller derived from the token onto
 the session (``bind_session_user``) before touching the repository, and no
 body field may select which profile is read or written. An id smuggled into
@@ -39,10 +44,12 @@ CALLER_ID = uuid.uuid4()
 OTHER_ID = uuid.uuid4()
 
 #: The exact field set ``ProfileOut`` may expose. Everything on ``profiles``
-#: is athlete-owned and legitimately visible; nothing from ``users``
-#: (``email``, ``password_hash``, ...) may appear.
+#: is athlete-owned and legitimately visible; the account ``email`` is the
+#: caller's own, read through the owner-scoped repository method. Nothing
+#: else from ``users`` (``password_hash``, ...) may appear.
 EXPECTED_PROFILE_KEYS = {
     "id",
+    "email",
     "created_at",
     "updated_at",
     "display_name",
@@ -127,6 +134,11 @@ class FakeProfileRepository:
     already have rejected anything outside the client-facing payload, so a
     ``ValueError`` path is exercised at the unit level by the repository's
     own tests, not here.
+
+    ``get_email`` mirrors the owner-scoped read: it returns the email of
+    exactly the ``user_id`` it was called with, so an assertion that the
+    response email equals this caller's email proves the email came from the
+    token identity's account and nobody else's.
     """
 
     def __init__(self, profile: FakeProfile | None = None) -> None:
@@ -137,6 +149,10 @@ class FakeProfileRepository:
     async def get_profile(self, session: Any, user_id: uuid.UUID) -> FakeProfile | None:
         self.calls.append(("get", user_id))
         return self.profile
+
+    async def get_email(self, session: Any, user_id: uuid.UUID) -> str:
+        self.calls.append(("email", user_id))
+        return f"user-{user_id}@example.com"
 
     async def update_profile(
         self, session: Any, user_id: uuid.UUID, **fields: Any
@@ -196,8 +212,12 @@ def test_get_profile_returns_callers_own_profile(monkeypatch: pytest.MonkeyPatch
     body = response.json()
     assert body["id"] == str(CALLER_ID)
     assert body["training_system"] == "heart_rate"
+    # The email is the caller's own account email: the fake derives it from
+    # the user_id it was called with, so a match proves the token identity's
+    # account was read and no other.
+    assert body["email"] == f"user-{CALLER_ID}@example.com"
     # The profile acted on is the one from the token, asserted directly.
-    assert repo.calls == [("get", CALLER_ID)]
+    assert repo.calls == [("get", CALLER_ID), ("email", CALLER_ID)]
     # The ownership guard ran with the token identity before the read.
     assert client.app.state.bound_callers == [CALLER_ID]  # type: ignore[attr-defined]
 
@@ -215,8 +235,10 @@ def test_patch_applies_allowed_field(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["display_name"] == "Racer"
+    # Same shape as GET: the response still carries the caller's own email.
+    assert response.json()["email"] == f"user-{CALLER_ID}@example.com"
     assert repo.updates == [{"display_name": "Racer"}]
-    assert repo.calls[0][1] == CALLER_ID
+    assert repo.calls == [("update", CALLER_ID), ("email", CALLER_ID)]
     # The ownership guard ran with the token identity before the write.
     assert client.app.state.bound_callers == [CALLER_ID]  # type: ignore[attr-defined]
 
@@ -272,7 +294,7 @@ def test_patch_acts_only_on_token_identity(monkeypatch: pytest.MonkeyPatch) -> N
 
     assert response.status_code == 200
     assert response.json()["id"] == str(CALLER_ID)
-    assert repo.calls == [("update", CALLER_ID)]
+    assert repo.calls == [("update", CALLER_ID), ("email", CALLER_ID)]
     assert repo.updates == [{"display_name": "Racer"}]
     # The ownership guard ran with the token identity before the write.
     assert client.app.state.bound_callers == [CALLER_ID]  # type: ignore[attr-defined]
@@ -374,6 +396,12 @@ def test_onboarding_on_missing_profile_is_404(monkeypatch: pytest.MonkeyPatch) -
 
 
 def test_response_exposes_only_profile_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The exact key set is asserted so an accidental new field is caught.
+
+    ``email`` IS part of the contract now — but only as the caller's OWN
+    account email, read through the owner-scoped repository method. Nothing
+    else from ``users`` may appear.
+    """
     repo = FakeProfileRepository()
     client = make_client(monkeypatch, repo)
 
@@ -384,4 +412,6 @@ def test_response_exposes_only_profile_fields(monkeypatch: pytest.MonkeyPatch) -
     for body in (get_body, patch_body, onboard_body):
         assert set(body) == EXPECTED_PROFILE_KEYS
         assert "password_hash" not in body
-        assert "email" not in body
+        # The email is present and is the token identity's own, never another
+        # account's and never a second field smuggled from ``users``.
+        assert body["email"] == f"user-{CALLER_ID}@example.com"

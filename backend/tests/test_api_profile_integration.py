@@ -69,6 +69,19 @@ async def _create_user(engine, email: str) -> uuid.UUID:
         return uuid.UUID(str(result.scalar_one()))
 
 
+async def _read_user_email(engine, user_id: uuid.UUID) -> str | None:
+    """Read the account email in a FRESH transaction on a SEPARATE connection.
+
+    Same anti-tautology rule as the profile row read: the expected value is
+    taken from storage, never from the response being asserted.
+    """
+    async with engine.connect() as conn:
+        row = await conn.execute(
+            text("select email from users where id = :id"), {"id": user_id}
+        )
+    return row.scalar_one_or_none()
+
+
 async def _read_profile_row(engine, user_id: uuid.UUID) -> dict:
     """Read the raw profile row in a FRESH transaction on a SEPARATE connection.
 
@@ -156,6 +169,28 @@ async def profile_user(migrated_db):
     engine = migrated_db["engine"]
     user = await _create_user(engine, f"profile-{uuid.uuid4().hex[:12]}@example.com")
     return {"engine": engine, "user": user}
+
+
+async def test_profile_response_returns_the_registered_email(profile_user):
+    """The email in the response is the one the user registered with.
+
+    The expected value is read back from ``users`` in a fresh transaction on
+    a separate connection, so the assertion cannot be satisfied by the
+    response itself. Both endpoints must return it so the response shape
+    stays consistent for the profile page.
+    """
+    engine, user = profile_user["engine"], profile_user["user"]
+    stored_email = await _read_user_email(engine, user)
+    assert stored_email  # the fixture registered a real user with an email
+
+    async with _real_client_for(user) as client:
+        read = await client.get("/profile")
+        assert read.status_code == 200
+        updated = await client.patch("/profile", json={"display_name": "Email Check"})
+        assert updated.status_code == 200
+
+    assert read.json()["email"] == stored_email
+    assert updated.json()["email"] == stored_email
 
 
 async def test_patch_profile_persists_in_a_fresh_session(profile_user):

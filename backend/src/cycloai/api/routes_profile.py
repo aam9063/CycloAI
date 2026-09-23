@@ -25,9 +25,11 @@ Ownership: the identity comes ONLY from the verified session token. The
 caller id is bound onto the session with :func:`bind_session_user` before
 any repository access, so the fail-closed ownership guard is exercised on
 every request and no query is unscoped. Nothing in the body may select
-which profile is read or written; no response touches ``users`` (the
-repository reads ``profiles`` directly, so ``password_hash`` can never be
-joined into a response).
+which profile is read or written. The single field the response takes from
+``users`` is the caller's OWN ``email``, read through the owner-scoped
+``ProfileRepository.get_email`` (same ``user_id`` parameter, same caller
+guard); the rest of the user row — ``password_hash`` included — has no path
+into a response.
 """
 
 from __future__ import annotations
@@ -35,7 +37,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import date, datetime
-from typing import Annotated, Final, Literal
+from typing import Annotated, Any, Final, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -72,18 +74,19 @@ ProfileRepoDep = Annotated[ProfileRepository, Depends(get_profile_repository)]
 
 
 class ProfileOut(BaseModel):
-    """The caller's own profile: exactly the ``profiles`` columns.
+    """The caller's own profile: the ``profiles`` columns plus their email.
 
     Every field here is athlete-owned and legitimately visible. The model is
-    built from the ``Profile`` ORM row only — the repository never joins
-    ``users``, so ``email`` and ``password_hash`` have no path into a
-    response, and the explicit field list makes any future drift a visible
-    schema change rather than a silent leak.
+    built from the ``Profile`` ORM row's attributes, plus the account
+    ``email`` read through the owner-scoped ``ProfileRepository.get_email`` —
+    the only field sourced from ``users``, and only ever the token identity's
+    own. The explicit field list makes any future drift a visible schema
+    change rather than a silent leak: no other ``users`` column
+    (``password_hash`` included) has a path into a response.
     """
 
-    model_config = ConfigDict(from_attributes=True)
-
     id: uuid.UUID
+    email: str
     created_at: datetime
     updated_at: datetime
     display_name: str | None
@@ -157,6 +160,40 @@ def _missing_profile() -> HTTPException:
     )
 
 
+async def _caller_email(
+    repo: ProfileRepository, session: AsyncSession, caller_id: uuid.UUID
+) -> str:
+    """Read the caller's own email through the owner-scoped repository.
+
+    ``profiles.id`` references ``users.id`` on delete cascade, so a profile
+    without its user row is the same integrity anomaly as a missing profile:
+    it collapses into the same ``404`` instead of inventing a value.
+    """
+    email = await repo.get_email(session, caller_id)
+    if email is None:
+        raise _missing_profile()
+    return email
+
+
+def _profile_out(profile: Any, email: str) -> ProfileOut:
+    """Build the response model: the profile row plus the caller's email.
+
+    Every field is read by name from the ``Profile`` row (``email`` excepted
+    — it lives on ``users`` and arrives from the owner-scoped read), then
+    VALIDATED through the model. This is deliberately not a blanket
+    serialisation: the field list on ``ProfileOut`` is the single authority
+    on what may appear in a response, and an unknown attribute on the row is
+    simply never read.
+    """
+    data = {
+        name: getattr(profile, name)
+        for name in ProfileOut.model_fields
+        if name != "email"
+    }
+    data["email"] = email
+    return ProfileOut.model_validate(data)
+
+
 @router.get(
     "/profile",
     response_model=ProfileOut,
@@ -174,13 +211,15 @@ async def read_profile(
     """Read the caller's own profile through the ownership-enforcing repo.
 
     The caller id comes only from the verified token and is bound onto the
-    session first, so the repository's fail-closed guard runs on this read.
+    session first, so the repository's fail-closed guard runs on this read
+    and on the account email read that follows it.
     """
     bind_session_user(session, caller_id)
     profile = await repo.get_profile(session, caller_id)
     if profile is None:
         raise _missing_profile()
-    return ProfileOut.model_validate(profile)
+    email = await _caller_email(repo, session, caller_id)
+    return _profile_out(profile, email)
 
 
 @router.patch(
@@ -222,7 +261,8 @@ async def update_own_profile(
         ) from None
     if profile is None:
         raise _missing_profile()
-    return ProfileOut.model_validate(profile)
+    email = await _caller_email(repo, session, caller_id)
+    return _profile_out(profile, email)
 
 
 @router.post(
@@ -305,4 +345,5 @@ async def complete_onboarding(
     updated = await repo.update_profile(session, caller_id, onboarding_completed=True)
     if updated is None:
         raise _missing_profile()
-    return ProfileOut.model_validate(updated)
+    email = await _caller_email(repo, session, caller_id)
+    return _profile_out(updated, email)
