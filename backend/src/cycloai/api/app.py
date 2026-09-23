@@ -13,6 +13,7 @@ from fastapi import FastAPI
 
 from cycloai.api.routes_account import router as account_router
 from cycloai.api.routes_auth import router as auth_router
+from cycloai.api.routes_chat import router as chat_router
 from cycloai.api.routes_conversations import router as conversations_router
 from cycloai.api.routes_generate import router as generate_router
 from cycloai.api.routes_profile import router as profile_router
@@ -23,7 +24,8 @@ __all__ = ["create_app"]
 
 def create_app() -> FastAPI:
     """Build the FastAPI application with the auth, account, generation,
-    conversation/message, profile/onboarding and waitlist routers."""
+    chat-context, conversation/message, profile/onboarding and waitlist
+    routers."""
     app = FastAPI(
         title="CycloAI API",
         description="Cycling workout generation with validated, athlete-owned plans.",
@@ -32,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router)
     app.include_router(account_router)
     app.include_router(generate_router)
+    app.include_router(chat_router)
     app.include_router(profile_router)
     app.include_router(conversations_router)
     app.include_router(waitlist_router)
