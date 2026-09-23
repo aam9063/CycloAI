@@ -3,9 +3,10 @@
 Outcome mapping is deliberately honest — the caller must be able to tell the
 three outcomes apart without reading server logs:
 
-* **success** → ``200`` with the structured workout, the coach prose, and
-  whether knowledge was used (retrieval being empty or failing is still a
-  success, with ``knowledge_used: false`` — never an error);
+* **success** → ``200`` with the structured workout, the coach prose,
+  whether knowledge was used, how many gate attempts it took, and the
+  advisory warnings that rode along (retrieval being empty or failing is
+  still a success, with ``knowledge_used: false`` — never an error);
 * **the gate exhausted its retry** → ``422`` carrying the findings verbatim,
   each with its ``source`` (``model_response`` / ``raw_payload`` /
   ``model_rules``), because "unusable JSON", "fabricated citation" and "broke
@@ -143,11 +144,18 @@ class GenerationRejectedOut(BaseModel):
 
 
 class GenerationSuccessOut(BaseModel):
-    """The 200 body: the validated workout plus the coach prose."""
+    """The 200 body: the validated workout plus the coach prose.
+
+    ``attempts`` tells the operator whether the gate needed its retry;
+    ``warnings`` carries the advisory findings for observability — only
+    errors block, so a success body must never contain one.
+    """
 
     workout: dict[str, Any]
     prose: str
     knowledge_used: bool
+    attempts: int
+    warnings: list[GenerationFindingOut]
 
 
 class ErrorOut(BaseModel):
@@ -243,4 +251,10 @@ async def generate(
         workout=result.workout.model_dump(mode="json"),
         prose=result.prose or "",
         knowledge_used=result.knowledge_used,
+        attempts=result.attempts,
+        warnings=[
+            finding
+            for finding in _findings_out(result.findings)
+            if finding.severity == "warning"
+        ],
     )
