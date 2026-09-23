@@ -19,16 +19,20 @@ Measured grammar facts (authoritative; do not re-derive):
 * 361 steps: 329 carry ``@ N bpm`` plus a zone label, 32 carry ``@ N RPE``
   with no zone label. The raw bpm magnitude is deliberately NOT carried into
   the domain model (invariant I1 forbids absolute physiological magnitudes);
-  a bpm step is represented by a :class:`ZoneTarget`.
+  a bpm step is represented by a :class:`ZoneTarget` with the HEART_RATE
+  system set explicitly: the corpus is heart-rate anchored (Friel %LTHR) and
+  a zone code alone is never enough.
 * 319 role lines (``Warm up``, ``Active``, ``Recovery``, ``Cool down``),
   run-length encoded: a role line applies to every following step until the
   next role line, so 42 steps inherit the previous role. A step with no role
   available at all is an error.
 * Zone labels resolve ONLY through
   :func:`cycloai.domain.zones.zone_from_label`; never match on label text.
-  Complete set: ``Zone 1: Recovery``, ``Zone 2: Aerobic``, ``Zone 3: Tempo``,
-  ``Zone 4: SubThreshold``, ``Zone 5A: SuperThreshold``,
-  ``Zone 5B: Aerobic Capacity``, ``Zone 5C: Anaerobic Capacity``.
+  The corpus is heart-rate anchored, so labels resolve in the HEART_RATE
+  system (the function's default). Complete set: ``Zone 1: Recovery``,
+  ``Zone 2: Aerobic``, ``Zone 3: Tempo``, ``Zone 4: SubThreshold``,
+  ``Zone 5A: SuperThreshold``, ``Zone 5B: Aerobic Capacity``,
+  ``Zone 5C: Anaerobic Capacity``.
 * Duration forms before the target: ``N min``, ``N sec`` and ``N:N`` clock
   form (for example ``36:20``). The clock form is preserved verbatim, never
   normalised (``ClockDuration.clock`` keeps the original string).
@@ -84,7 +88,7 @@ from cycloai.domain.workout import (
     StepTarget,
     ZoneTarget,
 )
-from cycloai.domain.zones import ZoneCode, zone_from_label
+from cycloai.domain.zones import TrainingSystem, ZoneRef, zone_from_label
 
 __all__ = [
     "CORPUS_FILENAME",
@@ -186,7 +190,7 @@ class _StepData:
     duration: StepDuration
     kind: str  # "bpm" | "RPE"
     value: int
-    zone: ZoneCode | None = None
+    zone: ZoneRef | None = None
     cadence: CadenceTarget | None = None
     intents: list[str] = field(default_factory=list)
 
@@ -230,7 +234,11 @@ def _build_step(step: _StepData) -> CyclingStep:
                 f"duration={step.duration})"
             )
         intent = INTENT_SEPARATOR.join(step.intents) if step.intents else None
-        target = ZoneTarget(zone=step.zone, intent=intent)
+        # The corpus prescribes in heart rate: set that system explicitly (the
+        # label resolution yields a ZoneRef; only its code rides onto the target).
+        target = ZoneTarget(
+            system=TrainingSystem.HEART_RATE, zone=step.zone.code, intent=intent
+        )
     return CyclingStep(
         duration=step.duration, role=step.role, target=target, cadence=step.cadence
     )
@@ -312,7 +320,7 @@ def parse_cycling_corpus(text: str) -> ParsedCorpus:
     current: _WorkoutData | None = None
     role: StepRole | None = None
     role_fresh = False  # True right after a role line, before the next step
-    pending_zone: ZoneCode | None = None
+    pending_zone: ZoneRef | None = None
     pending_zone_line: int | None = None
     pending_intents: list[str] = []
     pending_cadence: CadenceTarget | None = None
@@ -533,7 +541,12 @@ def _duration_to_dict(duration: StepDuration) -> dict:
 def _target_to_dict(target: StepTarget) -> dict:
     if isinstance(target, RpeTarget):
         return {"kind": "rpe", "rpe": target.rpe, "zone": None}
-    return {"kind": "zone", "zone": str(target.zone), "intent": target.intent}
+    return {
+        "kind": "zone",
+        "system": str(target.system),
+        "zone": str(target.zone),
+        "intent": target.intent,
+    }
 
 
 def _cadence_to_dict(cadence: CadenceTarget | None) -> dict | None:

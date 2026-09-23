@@ -29,6 +29,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -47,6 +48,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -65,6 +67,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -80,6 +83,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -95,6 +99,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -110,6 +115,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5A"
       }
     },
@@ -125,6 +131,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -140,6 +147,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -155,6 +163,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5A"
       }
     },
@@ -170,6 +179,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     }

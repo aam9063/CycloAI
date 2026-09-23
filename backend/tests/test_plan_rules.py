@@ -39,6 +39,7 @@ from cycloai.domain.workout import (
     PlanWeek,
     StepRole,
     TrainingPlan,
+    TrainingSystem,
     ZoneCode,
     ZoneTarget,
 )
@@ -67,7 +68,9 @@ def _z5a_session(minutes: int = 60) -> CyclingWorkout:
     step = CyclingStep(
         duration=MinutesDuration(minutes=minutes),
         role=StepRole.ACTIVE,
-        target=ZoneTarget(zone=ZoneCode.Z5A, intent="A TOPE"),
+        target=ZoneTarget(
+            system=TrainingSystem.HEART_RATE, zone=ZoneCode.Z5A, intent="A TOPE"
+        ),
     )
     return CyclingWorkout(
         id=f"z5a-{minutes}",

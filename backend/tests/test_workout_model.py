@@ -21,6 +21,7 @@ from cycloai.domain.workout import (
     SecondsDuration,
     StepRole,
     TrainingPlan,
+    TrainingSystem,
     ZoneTarget,
 )
 
@@ -31,7 +32,7 @@ def make_step(zone: str = "Z2", **overrides) -> CyclingStep:
     payload = {
         "role": StepRole.ACTIVE,
         "duration": {"kind": "minutes", "minutes": 15},
-        "target": {"kind": "zone", "zone": zone},
+        "target": {"kind": "zone", "system": "heart_rate", "zone": zone},
     }
     payload.update(overrides)
     return CyclingStep.model_validate(payload)
@@ -56,7 +57,7 @@ def make_prescriptive_workout(**overrides) -> CyclingWorkout:
                     CyclingStep(
                         role=StepRole.WARMUP,
                         duration={"kind": "minutes", "minutes": 30},
-                        target={"kind": "zone", "zone": "Z1"},
+                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
                     )
                 ],
                 role=StepRole.WARMUP,
@@ -67,7 +68,7 @@ def make_prescriptive_workout(**overrides) -> CyclingWorkout:
                     CyclingStep(
                         role=StepRole.RECOVERY,
                         duration={"kind": "minutes", "minutes": 5},
-                        target={"kind": "zone", "zone": "Z1"},
+                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
                     ),
                 ],
                 repeat_count=3,
@@ -77,7 +78,7 @@ def make_prescriptive_workout(**overrides) -> CyclingWorkout:
                     CyclingStep(
                         role=StepRole.COOLDOWN,
                         duration={"kind": "minutes", "minutes": 40},
-                        target={"kind": "zone", "zone": "Z1"},
+                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
                     )
                 ],
                 role=StepRole.COOLDOWN,
@@ -143,12 +144,12 @@ def test_step_carries_any_duration_variant() -> None:
 
 def test_i1_target_rejects_smuggled_bpm() -> None:
     with pytest.raises(ValidationError):
-        make_step(target={"kind": "zone", "zone": "Z2", "bpm": 127})
+        make_step(target={"kind": "zone", "system": "heart_rate", "zone": "Z2", "bpm": 127})
 
 
 def test_i1_target_rejects_smuggled_watts() -> None:
     with pytest.raises(ValidationError):
-        ZoneTarget(zone="Z2", watts=250)
+        ZoneTarget(system="heart_rate", zone="Z2", watts=250)
 
 
 def test_i1_step_rejects_undecorated_absolute_fields() -> None:
@@ -158,18 +159,44 @@ def test_i1_step_rejects_undecorated_absolute_fields() -> None:
         make_step(watts=200)
 
 
-# --- Invariant I2: closed corpus zone vocabulary ---
+# --- Invariant I2: closed zone vocabularies, identified by (system, code) ---
 
 
-@pytest.mark.parametrize("zone", ["Z8", "Z0", "Z5", "z2", "zone 2", "A TOPE"])
+@pytest.mark.parametrize("zone", ["Z8", "Z0", "z2", "zone 2", "A TOPE"])
 def test_i2_zone_codes_outside_the_closed_set_are_rejected(zone: str) -> None:
     with pytest.raises(ValidationError):
-        ZoneTarget(zone=zone)
+        ZoneTarget(system=TrainingSystem.HEART_RATE, zone=zone)
 
 
-def test_i2_valid_corpus_codes_are_accepted() -> None:
+def test_i2_valid_corpus_codes_are_accepted_in_the_heart_rate_system() -> None:
     for zone in ("Z1", "Z2", "Z3", "Z4", "Z5A", "Z5B", "Z5C"):
-        assert ZoneTarget(zone=zone).zone.value == zone
+        target = ZoneTarget(system=TrainingSystem.HEART_RATE, zone=zone)
+        assert target.zone.value == zone
+        assert target.system is TrainingSystem.HEART_RATE
+
+
+def test_i2_power_vocabulary_is_accepted_in_the_power_system() -> None:
+    for zone in ("Z1", "Z2", "Z3", "Z4", "Z5", "Z6", "Z7"):
+        target = ZoneTarget(system=TrainingSystem.POWER, zone=zone)
+        assert target.zone.value == zone
+        assert target.system is TrainingSystem.POWER
+
+
+def test_i2_power_only_code_is_rejected_in_the_heart_rate_system() -> None:
+    with pytest.raises(ValidationError):
+        ZoneTarget(system=TrainingSystem.HEART_RATE, zone="Z6")
+
+
+def test_i2_heart_rate_only_code_is_rejected_in_the_power_system() -> None:
+    with pytest.raises(ValidationError):
+        ZoneTarget(system=TrainingSystem.POWER, zone="Z5A")
+
+
+def test_i2_zone_target_requires_the_system_field_without_a_default() -> None:
+    """The system is REQUIRED: a bare code is never enough, and a default would
+    silently re-create the flat-vocabulary conflation."""
+    with pytest.raises(ValidationError):
+        ZoneTarget(zone="Z2")
 
 
 # --- RPE targets (corpus `@ N RPE`, never carrying a zone label) ---
@@ -197,7 +224,7 @@ def test_step_cannot_carry_both_a_zone_and_an_rpe() -> None:
     with pytest.raises(ValidationError):
         make_step(target={"kind": "rpe", "rpe": 8, "zone": "Z2"})
     with pytest.raises(ValidationError):
-        make_step(target={"kind": "zone", "zone": "Z2", "rpe": 8})
+        make_step(target={"kind": "zone", "system": "heart_rate", "zone": "Z2", "rpe": 8})
 
 
 def test_rpe_target_rejects_smuggled_bpm() -> None:
@@ -320,7 +347,10 @@ def test_i6_prescriptive_workout_requires_blocks() -> None:
 
 
 def test_intent_free_text_is_captured_on_the_target_not_the_zone() -> None:
-    step = make_step("Z5B", target={"kind": "zone", "zone": "Z5B", "intent": "A TOPE"})
+    step = make_step(
+        "Z5B",
+        target={"kind": "zone", "system": "heart_rate", "zone": "Z5B", "intent": "A TOPE"},
+    )
     assert step.target.zone.value == "Z5B"
     assert step.target.intent == "A TOPE"
 

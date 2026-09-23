@@ -43,6 +43,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -60,6 +61,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -77,6 +79,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -94,6 +97,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -111,6 +115,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -128,6 +133,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -145,6 +151,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -162,6 +169,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -179,6 +187,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -196,6 +205,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -213,6 +223,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -230,6 +241,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -247,6 +259,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -264,6 +277,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -281,6 +295,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -298,6 +313,7 @@
       "target": {
         "intent": "a tope",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -315,6 +331,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5C"
       }
     },
@@ -332,6 +349,7 @@
       "target": {
         "intent": "aceleración",
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z3"
       }
     },
@@ -347,6 +365,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -365,6 +384,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z4"
       }
     },
@@ -380,6 +400,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -398,6 +419,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z4"
       }
     },
@@ -413,6 +435,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -431,6 +454,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z4"
       }
     },
@@ -446,6 +470,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -464,6 +489,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5A"
       }
     },
@@ -479,6 +505,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     },
@@ -497,6 +524,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z5A"
       }
     },
@@ -512,6 +540,7 @@
       "target": {
         "intent": null,
         "kind": "zone",
+        "system": "heart_rate",
         "zone": "Z1"
       }
     }

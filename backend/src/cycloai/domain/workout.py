@@ -7,7 +7,10 @@ Structural invariants enforced here (feature doc section 3.1):
   RPE is a perceived-exertion scale, not an athlete-specific absolute value, so it
   does not violate I1. The schema forbids unknown extras, so no bpm/watts field
   can be smuggled in.
-- I2: zone codes are the closed corpus set defined in ``cycloai.domain.zones``.
+- I2: zone targets carry a (system, code) pair from the closed vocabularies
+  defined in ``cycloai.domain.zones``; the two training systems (power/%FTP
+  and heart-rate/%LTHR) are not interchangeable and a code alone is never
+  enough.
 - I5: ``total_duration_s`` and ``estimated_tss`` are computed fields derived from
   the structure; they are not caller-supplied inputs.
 - I6: ``prescriptive: false`` is a first-class shape for free-text sessions: a zone
@@ -21,7 +24,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from cycloai.domain.zones import ZoneCode
+from cycloai.domain.zones import ZONES, TrainingSystem, ZoneCode
 
 __all__ = [
     "CadenceTarget",
@@ -44,6 +47,7 @@ __all__ = [
     "StepRole",
     "StepTarget",
     "TrainingPlan",
+    "TrainingSystem",
     "ZoneCode",
     "ZoneTarget",
 ]
@@ -116,7 +120,15 @@ StepDuration = Annotated[
 
 
 class ZoneTarget(BaseModel):
-    """Zone step target: a closed-set zone code plus optional free-text intent (I1).
+    """Zone step target: a (system, code) pair plus optional free-text intent (I1).
+
+    ``system`` is REQUIRED with no default: a zone belongs to one training
+    system (power/%FTP or heart-rate/%LTHR), the same code means different
+    bounds in each, and hiding that choice behind a default would silently
+    re-create the flat-vocabulary conflation. The (system, code) pair must
+    exist in ``cycloai.domain.zones.ZONES``: power-only codes (``Z5``-``Z7``)
+    and heart-rate-only codes (``Z5A``-``Z5C``) are rejected outside their own
+    system.
 
     Intent annotations observed in the corpus (``APRIETA``, ``A TOPE``, ``NO TIENES
     QUE LLEGAR A ESTE PULSO``) are coach intents, not zones; they live here.
@@ -125,8 +137,18 @@ class ZoneTarget(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     kind: Literal["zone"] = "zone"
+    system: TrainingSystem
     zone: ZoneCode
     intent: str | None = None
+
+    @model_validator(mode="after")
+    def _enforce_system_code_pair(self) -> ZoneTarget:
+        if (self.system, self.zone) not in ZONES:
+            raise ValueError(
+                f"zone {self.zone.value} does not exist in the {self.system.value} "
+                f"training system"
+            )
+        return self
 
 
 class RpeTarget(BaseModel):

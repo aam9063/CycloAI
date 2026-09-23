@@ -34,7 +34,7 @@ from cycloai.domain.workout import (
     StepRole,
     ZoneTarget,
 )
-from cycloai.domain.zones import ZoneCode
+from cycloai.domain.zones import TrainingSystem, ZoneCode
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CORPUS_PATH = REPO_ROOT / "docs" / CORPUS_FILENAME
@@ -102,13 +102,18 @@ def test_rpe_steps_never_carry_a_zone(corpus: ParsedCorpus) -> None:
                 assert 1 <= step.target.rpe <= 10
 
 
-def test_zone_steps_use_the_closed_vocabulary(corpus: ParsedCorpus) -> None:
+def test_zone_steps_use_the_closed_vocabulary_and_the_heart_rate_system(
+    corpus: ParsedCorpus,
+) -> None:
+    """The corpus is heart-rate anchored: every zone target must record the
+    HEART_RATE system explicitly, never a bare code."""
     for parsed in corpus.workouts:
         if parsed.workout is None:
             continue
         for step in _steps(parsed):
             if isinstance(step.target, ZoneTarget):
                 assert step.target.zone in ZoneCode
+                assert step.target.system is TrainingSystem.HEART_RATE
 
 
 def test_cadence_bearing_steps_total(corpus: ParsedCorpus) -> None:
