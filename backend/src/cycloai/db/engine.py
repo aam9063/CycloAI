@@ -43,6 +43,26 @@ def get_sessionmaker() -> async_sessionmaker[AsyncSession]:
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    """FastAPI dependency: yield a session, closing it when the request ends."""
+    """FastAPI dependency: one transaction per request (unit of work).
+
+    The request boundary — not the individual route — owns the transaction:
+    when the request completes successfully the session is committed, and
+    when anything raises the session is rolled back and the exception is
+    re-raised. This is deliberate: the alternative (committing inside each
+    mutating route) fails silently the moment a route author forgets — the
+    route returns ``200`` and the data vanishes on close, with the failure
+    surfacing far from its cause. A route author cannot forget a boundary
+    they never have to write.
+
+    Note for other writers of sessions: code that creates its own session
+    outside a request (or overrides this dependency, as some integration
+    tests do) owns its own commit.
+    """
     async with get_sessionmaker()() as session:
-        yield session
+        try:
+            yield session
+        except Exception:
+            await session.rollback()
+            raise
+        else:
+            await session.commit()
