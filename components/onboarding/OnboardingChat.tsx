@@ -7,10 +7,11 @@ import {
   useTransition,
   useCallback,
 } from "react";
-import type { Profile } from "@/lib/supabase/types";
+import type { Profile } from "@/lib/api/types";
 import {
   STEPS,
   FTP_STEP,
+  LTHR_STEP,
   firstUnansweredStep,
   labelForAnswer,
   type OnboardingStepId,
@@ -110,10 +111,14 @@ export default function OnboardingChat({ initialProfile }: OnboardingChatProps) 
   const handleAnswer = useCallback(
     (stepId: OnboardingStepId, rawValue: unknown) => {
       // Find the display label for the user bubble.
-      const step = STEPS.find((s) => s.id === stepId) ?? (stepId === "ftp" ? FTP_STEP : null);
+      const step =
+        STEPS.find((s) => s.id === stepId) ??
+        (stepId === "ftp" ? FTP_STEP : stepId === "lthr" ? LTHR_STEP : null);
       const displayLabel =
         stepId === "ftp"
           ? `${rawValue} W`
+          : stepId === "lthr"
+          ? `${rawValue} ppm`
           : step?.kind === "options"
           ? (step.options?.find((o) => o.value === rawValue)?.label ?? String(rawValue))
           : String(rawValue ?? "");
@@ -148,6 +153,22 @@ export default function OnboardingChat({ initialProfile }: OnboardingChatProps) 
               type: "question",
               content: FTP_STEP.question,
               key: `q-live-ftp-${Date.now()}`,
+            },
+          ]);
+          return;
+        }
+
+        if (nextStepId === "lthr") {
+          // LTHR branch: mirrors Q5b — shown only for a heart-rate athlete,
+          // without adding a new dot.
+          setIsTransition(true);
+          setCurrentStep(LTHR_STEP);
+          setLog((prev) => [
+            ...prev,
+            {
+              type: "question",
+              content: LTHR_STEP.question,
+              key: `q-live-lthr-${Date.now()}`,
             },
           ]);
           return;
@@ -272,6 +293,19 @@ export default function OnboardingChat({ initialProfile }: OnboardingChatProps) 
               onSubmit={(watts) => handleAnswer("ftp", watts)}
               disabled={isPending}
               error={error}
+              shouldFocus={isTransition}
+            />
+          )}
+
+          {currentStep.kind === "lthr" && (
+            <FreeTextAnswer
+              key="lthr"
+              id="free-text-lthr"
+              label={currentStep.question}
+              placeholder="Ej: 165"
+              maxLength={3}
+              onSubmit={(value) => handleAnswer("lthr", value)}
+              disabled={isPending}
               shouldFocus={isTransition}
             />
           )}
