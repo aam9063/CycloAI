@@ -40,8 +40,9 @@ ownership-enforcing repositories. A conversation belonging to somebody else
 is refused EXACTLY like a nonexistent one — the same ``404`` detail constant
 as :mod:`cycloai.api.routes_conversations`, never a ``403``, which would
 confirm the conversation exists. Nothing in the request body selects whose
-profile is loaded: a smuggled ``id`` field is accepted and ignored, the same
-contract the conversation endpoints apply.
+profile is loaded: a smuggled ``id`` field is refused with a ``422``, the
+same rule every request body in this API applies (see the module docstring
+of :mod:`cycloai.api.routes_conversations`).
 """
 
 from __future__ import annotations
@@ -108,19 +109,15 @@ RetrieveDep = Annotated[RetrieveFn, Depends(get_retrieve)]
 class ChatContextCreate(BaseModel):
     """The body of ``POST /chat/context``.
 
-    ``extra="forbid"`` turns a typo into a clear ``422`` at the boundary.
-    The one deliberate exception is ``id``: it is ACCEPTED and IGNORED —
-    identity comes only from the verified token, so no body value can
-    influence which profile is loaded or which owner is written.
+    ``extra="forbid"`` turns a typo — or an identity field such as ``id`` —
+    into a clear ``422`` at the boundary. Identity comes only from the
+    verified token, never from the body (see the module docstring).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     message: str = Field(min_length=1, max_length=_MESSAGE_MAX_LENGTH)
     conversation_id: uuid.UUID | None = None
-    # Accepted but never applied: excluded so no body value can influence
-    # ownership. Identity is token-only.
-    id: uuid.UUID | None = Field(default=None, exclude=True)
 
 
 class ChatContextOut(BaseModel):

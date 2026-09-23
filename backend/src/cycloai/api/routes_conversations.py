@@ -17,9 +17,10 @@ Outcome mapping is deliberately narrow and honest:
 Ownership: the identity comes ONLY from the verified session token. The
 caller id is bound onto the session with :func:`bind_session_user` before
 any repository access, so the fail-closed ownership guard runs on every
-request. Nothing in the body or the path may select the owner: a ``user_id``
-or ``id`` smuggled into a body can never influence attribution — the
-repository stamps the message's ``user_id`` from the bound caller itself.
+request. Identity comes from the verified token and NEVER from the request
+body: a body that carries one (``id`` or ``user_id``) is a client mistake
+worth surfacing rather than absorbing, so ``extra="forbid"`` refuses it
+with a ``422`` — the same rule every request body in this API applies.
 
 Message rules (client bugs are rejected at the boundary, never stored):
 
@@ -175,19 +176,14 @@ class MessageOut(BaseModel):
 class ConversationCreate(BaseModel):
     """The body of ``POST /conversations``.
 
-    ``extra="forbid"`` turns a typo or a smuggled field into a clear ``422``
-    at the boundary. The one deliberate exception is ``id``: it is ACCEPTED
-    and IGNORED — identity comes only from the verified token, so an id in
-    the body can never select which owner is written (the repository stamps
-    ``user_id`` from the bound caller itself).
+    ``extra="forbid"`` turns a typo — or an identity field such as ``id`` —
+    into a clear ``422`` at the boundary. Identity comes only from the
+    verified token, never from the body (see the module docstring).
     """
 
     model_config = ConfigDict(extra="forbid")
 
     title: str | None = Field(default=None, max_length=500)
-    # Accepted but never applied: excluded so no body value can influence
-    # ownership. Identity is token-only.
-    id: uuid.UUID | None = Field(default=None, exclude=True)
 
 
 class MessageCreate(BaseModel):
@@ -205,9 +201,6 @@ class MessageCreate(BaseModel):
     role: Literal["user", "assistant"]
     content: str = Field(min_length=1, max_length=_CONTENT_MAX_LENGTH)
     metadata: dict[str, Any] | None = None
-    # Accepted but never applied: excluded so no body value can influence
-    # ownership. Identity is token-only.
-    id: uuid.UUID | None = Field(default=None, exclude=True)
 
     @model_validator(mode="after")
     def _bound_metadata(self) -> MessageCreate:

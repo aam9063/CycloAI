@@ -4,7 +4,8 @@ The auth seam and both repository seams are overridden, so these tests run
 without PostgreSQL and pin the API contract:
 
 * every endpoint serves only the caller's own data, and the owner acted on
-  is the one from the verified token (a body-supplied ``id`` is ignored);
+  is the one from the verified token (a body-supplied ``id`` is refused
+  with a ``422``);
 * unauthenticated requests are ``401`` on every endpoint;
 * a FOREIGN conversation and a NONEXISTENT one are indistinguishable —
   same status AND same body, asserted directly, because a distinct error
@@ -513,27 +514,49 @@ class TestTitleNormalisation:
 
 
 class TestOwnershipFromTokenOnly:
-    def test_body_id_is_ignored_on_conversation_creation(self, client, fake_repos):
+    def test_body_id_is_rejected_on_conversation_creation(self, client, fake_repos):
         conversation_repo, _ = fake_repos
         c = client(authenticated=True)
         response = c.post(
             "/conversations",
             json={"title": "smuggled", "id": str(OTHER_ID)},
         )
+        assert response.status_code == 422
+        # Nothing was written: the request was refused at the boundary.
+        assert conversation_repo.created == []
+
+    def test_conversation_creation_acts_on_the_token_identity(
+        self, client, fake_repos
+    ):
+        """No smuggled field at all: the owner acted on is the token's."""
+        conversation_repo, _ = fake_repos
+        c = client(authenticated=True)
+        response = c.post("/conversations", json={"title": "token-owned"})
         assert response.status_code == 201
-        assert response.json()["id"] != str(OTHER_ID)
         # The owner acted on is the one from the token.
         assert conversation_repo.created == [
-            {"user_id": CALLER_ID, "title": "smuggled", "summary": None}
+            {"user_id": CALLER_ID, "title": "token-owned", "summary": None}
         ]
 
-    def test_body_id_is_ignored_on_message_append(self, client, fake_repos):
+    def test_body_id_is_rejected_on_message_append(self, client, fake_repos):
         conversation_repo, message_repo = fake_repos
         conversation = conversation_repo.seed(CALLER_ID)
         c = client(authenticated=True)
         response = c.post(
             f"/conversations/{conversation.id}/messages",
             json={"role": "user", "content": "hi", "id": str(OTHER_ID)},
+        )
+        assert response.status_code == 422
+        assert message_repo.appended == []
+
+    def test_message_append_acts_on_the_token_identity(self, client, fake_repos):
+        """No smuggled field at all: the owner acted on is the token's."""
+        conversation_repo, message_repo = fake_repos
+        conversation = conversation_repo.seed(CALLER_ID)
+        c = client(authenticated=True)
+        response = c.post(
+            f"/conversations/{conversation.id}/messages",
+            json={"role": "user", "content": "hi"},
         )
         assert response.status_code == 201
         assert response.json()["user_id"] == str(CALLER_ID)

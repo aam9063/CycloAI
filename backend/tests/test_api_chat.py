@@ -5,7 +5,7 @@ retrieval callable are all overridden. The endpoint must be verified against
 its contract, not against storage:
 
 * the prompt is built from the TOKEN's identity's profile — a smuggled body
-  ``id`` is accepted and ignored;
+  ``id`` is refused with a ``422``;
 * a foreign conversation id is refused EXACTLY like a nonexistent one
   (asserted directly: identical status, identical detail);
 * a threshold-less athlete still gets the honest no-threshold prompt;
@@ -322,22 +322,28 @@ class TestChatContextEndpoint:
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
         assert response.json() == {"detail": "Authentication required."}
 
-    def test_profile_loaded_is_token_identity_smuggled_id_ignored(
-        self, harness
-    ) -> None:
+    def test_body_id_is_rejected(self, harness) -> None:
         client, fakes = harness(profile=make_profile())
         response = client.post(
             "/chat/context",
             json={"message": "hola", "id": str(SMUGGLED_ID)},
         )
+        assert response.status_code == status.HTTP_422_UNPROCESSABLE_ENTITY
+        # Nothing was read or written: the request was refused at the
+        # boundary, before any repository access.
+        assert fakes.profile_repo.read_for == []
+        assert fakes.conversation_repo.created == []
+
+    def test_profile_loaded_is_token_identity(self, harness) -> None:
+        """No smuggled field at all: the identity acted on is the token's."""
+        client, fakes = harness(profile=make_profile())
+        response = client.post("/chat/context", json={"message": "hola"})
         assert response.status_code == status.HTTP_200_OK
-        # The profile was read for the TOKEN's identity, never for the body id.
+        # The profile was read for the TOKEN's identity.
         assert fakes.profile_repo.read_for == [CALLER_ID]
-        # The conversation is created for the bound caller, and the smuggled
-        # id did not become the conversation id.
+        # The conversation is created for the bound caller.
         created = fakes.conversation_repo.created[0]
         assert created.user_id == CALLER_ID
-        assert created.id != SMUGGLED_ID
         assert response.json()["conversation_id"] == str(created.id)
 
     def test_response_leaks_nothing_from_users_beyond_prompt_needs(
