@@ -17,12 +17,14 @@ There is deliberately no heart-rate-to-power conversion anywhere in this module:
 the relationship is individual and drifts with fitness, fatigue, heat and
 duration, so a conversion factor would be fabricated precision.
 
-TSS coverage is reported, not fixed
------------------------------------
+TSS coverage is derived, then reported
+--------------------------------------
 When ``load_metric="tss"`` and the plan contains prescriptions that TSS cannot
 represent (heart rate or perceived exertion), the validator emits a warning
-naming the count. It does not convert and it does not guess. A later task will
-enforce this properly once a zone reference carries its training system.
+naming the count. The count is DERIVED from the plan's own step targets by
+:func:`count_non_power_prescriptions`; a caller may still pass an explicit
+number, which is honoured as an override. It does not convert and it does not
+guess.
 """
 
 from __future__ import annotations
@@ -32,7 +34,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Literal
 
-from .workout import CyclingWorkout, PlanWeek, TrainingPlan, ZoneTarget
+from .workout import CyclingWorkout, PlanWeek, RpeTarget, TrainingPlan, TrainingSystem, ZoneTarget
 
 __all__ = [
     "HIGH_INTENSITY_PREFIXES",
@@ -49,6 +51,7 @@ __all__ = [
     "PlanFinding",
     "PlanValidationReport",
     "Severity",
+    "count_non_power_prescriptions",
     "validate_training_plan",
 ]
 
@@ -81,8 +84,9 @@ TSB_DEBT_THRESHOLD = -25.0
 
 #: Zone-code prefixes that count as high intensity. Both vocabularies are covered
 #: without needing to know which system the plan uses: Coggan's Z5/Z6/Z7, and the
-#: corpus's Z5A/Z5B/Z5C. A zone reference will carry its system in a later task,
-#: at which point this approximation can be replaced by a system-aware check.
+#: corpus's Z5A/Z5B/Z5C. Zone targets now carry their training system
+#: (``ZoneTarget.system``); this prefix check stays system-agnostic because both
+#: vocabularies mark top intensity with the same ``Z5`` prefix.
 HIGH_INTENSITY_PREFIXES = ("Z5", "Z6", "Z7")
 
 _RELATIVE_TOLERANCE = 1e-9
@@ -152,6 +156,31 @@ def weekly_load(week: PlanWeek, load_metric: LoadMetric) -> float:
     return week.total_estimated_tss
 
 
+def count_non_power_prescriptions(plan: TrainingPlan) -> int:
+    """Count a plan's prescriptions that TSS cannot represent, from the data.
+
+    Walks every cycling step target in the plan: a heart-rate zone target and
+    an RPE target each count once per step instance (a block repeated N times
+    contributes N per step, matching how ``CyclingWorkout.estimated_tss``
+    aggregates durations); a POWER zone target is TSS's own anchor and is never
+    counted. Gym blocks prescribe no cycling targets and contribute 0.
+    """
+    count = 0
+    for week in plan.weeks:
+        for workout in week.workouts:
+            if not isinstance(workout, CyclingWorkout):
+                continue
+            for block in workout.blocks:
+                for step in block.steps:
+                    target = step.target
+                    if (
+                        isinstance(target, ZoneTarget)
+                        and target.system is not TrainingSystem.POWER
+                    ) or isinstance(target, RpeTarget):
+                        count += block.repeat_count
+    return count
+
+
 def _zone_code_of(target: object) -> str | None:
     """Return the zone code of a step target, or None for RPE and free text."""
     if isinstance(target, ZoneTarget):
@@ -178,7 +207,7 @@ def validate_training_plan(
     *,
     load_metric: LoadMetric = "hours",
     athlete_state: AthleteLoadState | None = None,
-    non_power_prescriptions: int = 0,
+    non_power_prescriptions: int | None = None,
 ) -> PlanValidationReport:
     """Validate a training plan's load progression, recovery cadence and TSB gating.
 
@@ -189,8 +218,12 @@ def validate_training_plan(
         athlete_state: the athlete's current load metrics. When omitted, the TSB
             rules are recorded in ``not_evaluated`` instead of passing silently.
         non_power_prescriptions: how many prescriptions in the plan are expressed
-            as heart rate or perceived exertion, which TSS cannot represent. Only
-            meaningful together with ``load_metric="tss"``.
+            as heart rate or perceived exertion, which TSS cannot represent.
+            When omitted (``None``, the default) the count is DERIVED from the
+            plan's own step targets via :func:`count_non_power_prescriptions`;
+            when the caller passes an explicit number, that number is honoured
+            as an override. Only meaningful together with
+            ``load_metric="tss"``.
     """
     report = PlanValidationReport()
     weeks: Sequence[PlanWeek] = plan.weeks
@@ -333,6 +366,9 @@ def validate_training_plan(
         # athlete with a high CTL tolerates quality work.
 
     # R4 — TSS cannot represent heart-rate or perceived-exertion prescriptions.
+    # The count comes from the plan's own targets unless the caller overrides it.
+    if non_power_prescriptions is None:
+        non_power_prescriptions = count_non_power_prescriptions(plan)
     if load_metric == "tss" and non_power_prescriptions > 0:
         report.warnings.append(
             PlanFinding(

@@ -28,6 +28,7 @@ from cycloai.domain.plan_rules import (
     TSB_RECOVERY_THRESHOLD,
     AthleteLoadState,
     PlanValidationReport,
+    count_non_power_prescriptions,
     validate_training_plan,
     weekly_load,
 )
@@ -37,6 +38,7 @@ from cycloai.domain.workout import (
     CyclingWorkout,
     MinutesDuration,
     PlanWeek,
+    RpeTarget,
     StepRole,
     TrainingPlan,
     TrainingSystem,
@@ -85,6 +87,40 @@ def _z5a_session(minutes: int = 60) -> CyclingWorkout:
 def _week(number: int, *durations_s: int) -> PlanWeek:
     """A week of free-text sessions, one per duration, controlling load in hours."""
     return PlanWeek(number=number, workouts=[_freeform(seconds) for seconds in durations_s])
+
+
+def _zone_session(system: TrainingSystem, zone: ZoneCode, minutes: int = 60) -> CyclingWorkout:
+    """A prescriptive session with one step in the given (system, zone) pair."""
+    step = CyclingStep(
+        duration=MinutesDuration(minutes=minutes),
+        role=StepRole.ACTIVE,
+        target=ZoneTarget(system=system, zone=zone),
+    )
+    return CyclingWorkout(
+        id=f"{system.value}-{zone.value}-{minutes}",
+        name="Zone session",
+        objective="Test session",
+        sources=["test-fixture"],
+        prescriptive=True,
+        blocks=[CyclingBlock(role=StepRole.WORK, steps=[step])],
+    )
+
+
+def _rpe_session(minutes: int = 30) -> CyclingWorkout:
+    """A prescriptive session with one RPE-targeted step."""
+    step = CyclingStep(
+        duration=MinutesDuration(minutes=minutes),
+        role=StepRole.ACTIVE,
+        target=RpeTarget(rpe=8),
+    )
+    return CyclingWorkout(
+        id=f"rpe-{minutes}",
+        name="RPE session",
+        objective="Perceived exertion",
+        sources=["test-fixture"],
+        prescriptive=True,
+        blocks=[CyclingBlock(role=StepRole.WORK, steps=[step])],
+    )
 
 
 def _plan(*weeks: PlanWeek, plan_id: str = "plan-1") -> TrainingPlan:
@@ -282,11 +318,13 @@ def test_hours_metric_never_flags_metric_mismatch() -> None:
 def test_same_plan_in_hours_and_tss_uses_only_its_own_metric() -> None:
     # The same plan is compared against itself in ONE metric per report: the
     # hours report never carries the tss-only mismatch finding (even with 3
-    # non-power prescriptions), and each metric measures its own weekly load.
-    # Structured sessions, because free-text sessions carry no TSS estimate.
+    # non-power prescriptions passed explicitly), and each metric measures its
+    # own weekly load. The sessions are POWER prescriptions: only power carries
+    # any TSS at all, so the tss load is non-zero and progression is checkable
+    # in both metrics.
     plan = _plan(
-        PlanWeek(number=1, workouts=[_z5a_session(60)]),
-        PlanWeek(number=2, workouts=[_z5a_session(68)]),
+        PlanWeek(number=1, workouts=[_zone_session(TrainingSystem.POWER, ZoneCode.Z2, 60)]),
+        PlanWeek(number=2, workouts=[_zone_session(TrainingSystem.POWER, ZoneCode.Z2, 68)]),
     )
 
     hours_report = validate_training_plan(plan, load_metric="hours", non_power_prescriptions=3)
@@ -298,8 +336,78 @@ def test_same_plan_in_hours_and_tss_uses_only_its_own_metric() -> None:
     assert "weekly_load_progression" in _warning_codes(hours_report)
     assert "weekly_load_progression" in _warning_codes(tss_report)
     assert weekly_load(plan.weeks[0], "hours") == 1.0
-    assert weekly_load(plan.weeks[0], "tss") == pytest.approx(107.5)  # 1 h at the Z5 midpoint
+    # 1 h at the POWER Z2 midpoint: (3600/3600) * 50.0 = 50.0.
+    assert weekly_load(plan.weeks[0], "tss") == pytest.approx(50.0)
     assert weekly_load(plan.weeks[0], "tss") != weekly_load(plan.weeks[0], "hours")
+
+
+# --- R4: the non-power prescription count is derived from the plan's data ------
+
+
+def test_all_heart_rate_plan_under_tss_warns_without_a_caller_supplied_count() -> None:
+    # The count comes from the plan's own targets: validating an all-heart-rate
+    # plan under "tss" warns with no caller-supplied count at all. The old
+    # default of 0 covered nothing automatically — that was the defect.
+    plan = _plan(PlanWeek(number=1, workouts=[_z5a_session()]))
+    report = validate_training_plan(plan, load_metric="tss")
+    mismatch = [w for w in report.warnings if w.code == "load_metric_mismatch"]
+    assert len(mismatch) == 1
+    assert "1 prescription(s)" in mismatch[0].message
+
+
+def test_all_heart_rate_plan_under_hours_does_not_warn() -> None:
+    # Hours are derivable from any prescription, heart rate included.
+    plan = _plan(PlanWeek(number=1, workouts=[_z5a_session()]))
+    report = validate_training_plan(plan, load_metric="hours")
+    assert "load_metric_mismatch" not in _warning_codes(report)
+
+
+def test_derived_count_walks_systems_rpe_targets_and_repeats() -> None:
+    repeated_hr = CyclingWorkout(
+        id="hr-repeated",
+        name="HR repeated",
+        objective="Test session",
+        sources=["test-fixture"],
+        prescriptive=True,
+        blocks=[
+            CyclingBlock(
+                role=StepRole.WORK,
+                steps=[
+                    CyclingStep(
+                        duration=MinutesDuration(minutes=10),
+                        role=StepRole.ACTIVE,
+                        target=ZoneTarget(system=TrainingSystem.HEART_RATE, zone=ZoneCode.Z2),
+                    ),
+                    CyclingStep(
+                        duration=MinutesDuration(minutes=10),
+                        role=StepRole.ACTIVE,
+                        target=ZoneTarget(system=TrainingSystem.HEART_RATE, zone=ZoneCode.Z3),
+                    ),
+                ],
+                repeat_count=3,
+            )
+        ],
+    )
+    plan = _plan(
+        PlanWeek(
+            number=1,
+            workouts=[
+                _zone_session(TrainingSystem.POWER, ZoneCode.Z4),
+                repeated_hr,
+                _rpe_session(),
+            ],
+        )
+    )
+    # 2 heart-rate steps x 3 repeats = 6, plus 1 RPE step = 7; the POWER step
+    # is TSS's own anchor and is never counted.
+    assert count_non_power_prescriptions(plan) == 7
+
+
+def test_explicit_non_power_count_still_overrides_the_derived_one() -> None:
+    plan = _plan(PlanWeek(number=1, workouts=[_z5a_session()]))
+    report = validate_training_plan(plan, load_metric="tss", non_power_prescriptions=7)
+    mismatch = next(w for w in report.warnings if w.code == "load_metric_mismatch")
+    assert "7 prescription(s)" in mismatch.message
 
 
 # --- Structural errors and the clean plan -------------------------------------

@@ -38,6 +38,15 @@ def make_step(zone: str = "Z2", **overrides) -> CyclingStep:
     return CyclingStep.model_validate(payload)
 
 
+def _power_step(zone: str, minutes: int = 15, role: StepRole = StepRole.ACTIVE) -> CyclingStep:
+    """A POWER-system zone step, for tests that exercise the TSS arithmetic."""
+    return CyclingStep(
+        role=role,
+        duration={"kind": "minutes", "minutes": minutes},
+        target={"kind": "zone", "system": "power", "zone": zone},
+    )
+
+
 def make_block(
     steps: list[CyclingStep],
     repeat_count: int = 1,
@@ -46,7 +55,17 @@ def make_block(
     return CyclingBlock(role=role, steps=steps, repeat_count=repeat_count)
 
 
-def make_prescriptive_workout(**overrides) -> CyclingWorkout:
+def make_prescriptive_workout(system: str = "heart_rate", **overrides) -> CyclingWorkout:
+    """A corpus-shaped prescriptive workout.
+
+    ``system`` defaults to ``heart_rate`` because every corpus target is a
+    heart-rate zone; tests that exercise the power-derived TSS arithmetic pass
+    ``system="power"`` to get the same shape with POWER targets.
+    """
+
+    def zone_target(zone: str) -> dict:
+        return {"kind": "zone", "system": system, "zone": zone}
+
     payload = {
         "id": "E1",
         "name": "Base endurance",
@@ -57,18 +76,22 @@ def make_prescriptive_workout(**overrides) -> CyclingWorkout:
                     CyclingStep(
                         role=StepRole.WARMUP,
                         duration={"kind": "minutes", "minutes": 30},
-                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
+                        target=zone_target("Z1"),
                     )
                 ],
                 role=StepRole.WARMUP,
             ),
             make_block(
                 [
-                    make_step("Z2"),
+                    CyclingStep(
+                        role=StepRole.ACTIVE,
+                        duration={"kind": "minutes", "minutes": 15},
+                        target=zone_target("Z2"),
+                    ),
                     CyclingStep(
                         role=StepRole.RECOVERY,
                         duration={"kind": "minutes", "minutes": 5},
-                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
+                        target=zone_target("Z1"),
                     ),
                 ],
                 repeat_count=3,
@@ -78,7 +101,7 @@ def make_prescriptive_workout(**overrides) -> CyclingWorkout:
                     CyclingStep(
                         role=StepRole.COOLDOWN,
                         duration={"kind": "minutes", "minutes": 40},
-                        target={"kind": "zone", "system": "heart_rate", "zone": "Z1"},
+                        target=zone_target("Z1"),
                     )
                 ],
                 role=StepRole.COOLDOWN,
@@ -277,14 +300,105 @@ def test_i5_derived_metrics_are_computed_from_structure() -> None:
     workout = make_prescriptive_workout()
     # 30 min warm-up + 3 x (15 + 5) min main + 40 min cool-down = 7800 s.
     assert workout.total_duration_s == 7800
-    # TSS/h midpoints: Z1 20, Z2 50 -> (5100/3600)*20 + (2700/3600)*50 = 65.8.
-    assert workout.estimated_tss == pytest.approx(65.8)
+    # This fixture is corpus-faithful: every target is a HEART-RATE zone. TSS is
+    # anchored on power (IF = NP/FTP) and the heart-rate knowledge base
+    # (zonas-entrenamiento-pulso.md) quantifies no TSS/h at all, so there is no
+    # honest per-zone load for these steps. The old expectation of 65.8 here
+    # encoded the defect: it multiplied heart-rate durations by TSS/h midpoints
+    # quoted from the POWER document, silently treating a heart-rate
+    # prescription as a power prescription. TSS is therefore 0.0, and the
+    # omission is reported by the uncovered count instead of being hidden.
+    assert workout.estimated_tss == 0.0
+    # 1 warm-up + 3 x 2 main + 1 cool-down = 8 heart-rate step instances.
+    assert workout.tss_uncovered_target_count == 8
+
+
+def test_i5_power_workout_tss_still_uses_the_power_midpoints() -> None:
+    workout = make_prescriptive_workout(
+        system="power",
+        blocks=[
+            make_block(
+                [
+                    _power_step("Z2", minutes=60),
+                    _power_step("Z4", minutes=30),
+                ]
+            )
+        ],
+    )
+    # Hand arithmetic from the power-document midpoints (Z2 50, Z4 87.5 TSS/h):
+    # 60 min at Z2 -> (3600/3600) * 50.0 = 50.0; 30 min at Z4 ->
+    # (1800/3600) * 87.5 = 43.75; raw total = 93.75, rounded to the field's
+    # 1-decimal precision -> 93.8.
+    assert workout.estimated_tss == pytest.approx(93.8)
+    assert workout.tss_uncovered_target_count == 0
+
+
+def test_i5_mixed_workout_tss_covers_only_the_power_steps() -> None:
+    workout = make_prescriptive_workout(
+        blocks=[
+            make_block(
+                [
+                    make_step("Z2"),  # heart-rate target: duration, never TSS
+                    _power_step("Z3", minutes=60),
+                ],
+                repeat_count=2,
+            )
+        ]
+    )
+    # Only the POWER Z3 instances feed TSS: 2 x (3600/3600) * 72.5 = 145.0.
+    assert workout.estimated_tss == pytest.approx(145.0)
+    # Only the 2 heart-rate instances are uncovered; power ones are covered.
+    assert workout.tss_uncovered_target_count == 2
+
+
+def test_i5_power_z5_uses_the_documented_107_5_midpoint() -> None:
+    workout = make_prescriptive_workout(
+        system="power",
+        blocks=[make_block([_power_step("Z5", minutes=36)])],
+    )
+    # Hand arithmetic from the power document ("Zona 5 ... TSS por hora: 95-120",
+    # midpoint 107.5): 36 min = 2160 s -> (2160/3600) * 107.5 = 0.6 * 107.5
+    # = 64.5.
+    assert workout.estimated_tss == pytest.approx(64.5)
+    assert workout.tss_uncovered_target_count == 0
+
+
+def test_i5_power_z6_and_z7_are_not_covered_by_tss() -> None:
+    """The power document states TSS cannot quantify its zones 6 and 7
+    ("TSS difícil de estimar con precisión en esta zona" for Z6, "No se
+    cuantifica de manera adecuada con TSS o IF" for Z7), so a POWER target in
+    either zone must contribute 0 to the estimate and be counted as uncovered
+    instead of raising or being multiplied by an invented figure."""
+    workout = make_prescriptive_workout(
+        system="power",
+        blocks=[
+            make_block([_power_step("Z6", minutes=2)]),
+            make_block([_power_step("Z7", minutes=1)]),
+        ],
+    )
+    assert workout.estimated_tss == 0.0
+    assert workout.tss_uncovered_target_count == 2
+
+
+def test_i5_power_z6_does_not_raise_alongside_a_covered_zone() -> None:
+    workout = make_prescriptive_workout(
+        system="power",
+        blocks=[make_block([_power_step("Z5", minutes=36), _power_step("Z6", minutes=5)])],
+    )
+    # Only the Z5 instances feed TSS: (2160/3600) * 107.5 = 64.5; the Z6
+    # instance is uncovered, not estimated and not a crash.
+    assert workout.estimated_tss == pytest.approx(64.5)
+    assert workout.tss_uncovered_target_count == 1
 
 
 def test_i5_derived_metrics_are_serialised() -> None:
-    data = make_prescriptive_workout().model_dump()
+    # A POWER workout, the only kind that carries any TSS: the derived metrics
+    # must survive serialisation, including the coverage count.
+    data = make_prescriptive_workout(system="power").model_dump()
     assert data["total_duration_s"] == 7800
+    # (5100/3600)*20 + (2700/3600)*50 = 28.33... + 37.5 = 65.8.
     assert data["estimated_tss"] == pytest.approx(65.8)
+    assert data["tss_uncovered_target_count"] == 0
 
 
 def test_i5_repeat_count_multiplies_step_durations() -> None:
@@ -303,7 +417,7 @@ def test_i5_rpe_steps_count_duration_but_not_tss() -> None:
             make_block(
                 [
                     make_step(target={"kind": "rpe", "rpe": 8}),
-                    make_step("Z1", duration={"kind": "minutes", "minutes": 5}),
+                    _power_step("Z1", minutes=5),
                 ],
                 repeat_count=3,
             )
@@ -311,8 +425,31 @@ def test_i5_rpe_steps_count_duration_but_not_tss() -> None:
     )
     # 3 x (15 + 5) min = 3600 s of total duration...
     assert workout.total_duration_s == 3600
-    # ...but only the Z1 steps feed the TSS estimate: (900/3600)*20 = 5.0.
+    # ...but only the POWER Z1 steps feed the TSS estimate: (900/3600)*20 = 5.0.
     assert workout.estimated_tss == pytest.approx(5.0)
+    # The 3 RPE step instances are prescriptions TSS cannot represent.
+    assert workout.tss_uncovered_target_count == 3
+
+
+def test_i5_rpe_steps_are_reported_as_not_covered_by_tss() -> None:
+    """Design decision: an RPE prescription is also outside TSS's power anchor,
+    so it counts as uncovered. The field exists so a 0.0 estimate can never be
+    read as "no work was prescribed", and an RPE step prescribes real work
+    that TSS cannot represent — the same population plan_rules'
+    load_metric_mismatch warning counts ("heart rate or perceived exertion")."""
+    workout = make_prescriptive_workout(
+        blocks=[make_block([make_step(target={"kind": "rpe", "rpe": 8})])]
+    )
+    assert workout.estimated_tss == 0.0
+    assert workout.tss_uncovered_target_count == 1
+
+
+def test_i6_free_text_session_reports_no_uncovered_targets() -> None:
+    """Free-text sessions carry no steps (I6): there is nothing to count, so
+    their behaviour is unchanged."""
+    workout = make_free_text_workout()
+    assert workout.estimated_tss == 0.0
+    assert workout.tss_uncovered_target_count == 0
 
 
 # --- Invariant I6: free-text sessions are a first-class shape ---
@@ -520,7 +657,12 @@ def test_gym_activation_subheader_is_covered_by_the_activation_list() -> None:
 def test_plan_week_derives_weekly_load_metrics() -> None:
     free_text = make_free_text_workout()
     core_block = GymBlock(name=GymBlockName.CORE)
-    week = PlanWeek(number=1, workouts=[make_prescriptive_workout(), free_text, core_block])
+    # The prescriptive workout uses POWER targets: it is the only kind that
+    # carries a TSS estimate at all, and the weekly figure must keep working.
+    week = PlanWeek(
+        number=1,
+        workouts=[make_prescriptive_workout(system="power"), free_text, core_block],
+    )
     assert week.total_duration_s == 7800 + 7200
     assert week.total_estimated_tss == pytest.approx(65.8)
 

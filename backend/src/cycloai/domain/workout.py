@@ -232,17 +232,25 @@ class CyclingBlock(BaseModel):
 
 
 # TSS per hour midpoints quoted from knowledge-base/training/zonas-entrenamiento-potencia.md:
-#   Z1 15-25, Z2 40-60, Z3 65-80, Z4 80-95, Z5 95-120.
-# The corpus sub-zones Z5A/Z5B/Z5C refine Coggan Z5, whose midpoint (107.5) is used
-# as a documented proxy; the KB document quantifies no TSS/h beyond these bands.
+#   Z1 15-25, Z2 40-60, Z3 65-80, Z4 80-95, Z5 95-120 ("pero los intervalos
+#   rara vez duran 1 hora entera").
+# These values come from the POWER document and apply to POWER zone targets
+# ONLY: TSS is defined off power (IF = NP/FTP), and the heart-rate document
+# (zonas-entrenamiento-pulso.md) quantifies no TSS/h at all, so heart-rate
+# targets must never be multiplied by these numbers.
+# Z6 and Z7 are deliberately ABSENT: the same document states for zone 6
+# "TSS difícil de estimar con precisión en esta zona" and for zone 7 "No se
+# cuantifica de manera adecuada con TSS o IF", so no honest midpoint exists;
+# a POWER target in Z6 or Z7 is NOT COVERED by TSS (it is counted by
+# tss_uncovered_target_count) and is never multiplied by an invented figure.
+# The heart-rate-only sub-zone codes Z5A/Z5B/Z5C are likewise absent: they
+# belong to the heart-rate vocabulary, not to this power-model table.
 _TSS_PER_HOUR_MIDPOINT: dict[ZoneCode, float] = {
     ZoneCode.Z1: 20.0,
     ZoneCode.Z2: 50.0,
     ZoneCode.Z3: 72.5,
     ZoneCode.Z4: 87.5,
-    ZoneCode.Z5A: 107.5,
-    ZoneCode.Z5B: 107.5,
-    ZoneCode.Z5C: 107.5,
+    ZoneCode.Z5: 107.5,
 }
 
 
@@ -301,23 +309,72 @@ class CyclingWorkout(BaseModel):
     @computed_field
     @property
     def estimated_tss(self) -> float:
-        """Derived TSS estimate from zone durations (I5); 0.0 for free-text sessions.
+        """Derived TSS estimate from POWER zone durations only (I5).
 
-        RPE-targeted steps contribute duration but no TSS: the TSS/hour midpoints
-        are keyed on zone codes and the corpus defines no zone for RPE steps.
+        TSS is defined off power (IF = NP/FTP), and the TSS/hour midpoints
+        below are quoted from the power knowledge-base document, so ONLY steps
+        whose target is a POWER ``ZoneTarget`` with a documented midpoint
+        (``Z1``-``Z5``). Heart-rate steps, RPE steps and POWER steps in ``Z6``
+        or ``Z7`` contribute nothing: the heart-rate knowledge base quantifies
+        no TSS/h, and the power document states TSS cannot be quantified for
+        its zones 6 and 7, so no honest substitution exists for any of them.
+        The omissions are reported by
+        :attr:`tss_uncovered_target_count` instead of being hidden, so a 0.0
+        can never be mistaken for "no work was prescribed". 0.0 for free-text
+        sessions (I6), which carry no steps at all.
         """
         zone_seconds: dict[ZoneCode, int] = {}
         for block in self.blocks:
             for step in block.steps:
-                if not isinstance(step.target, ZoneTarget):
+                target = step.target
+                if (
+                    not isinstance(target, ZoneTarget)
+                    or target.system is not TrainingSystem.POWER
+                ):
                     continue
-                code = step.target.zone
+                code = target.zone
                 step_seconds = step.duration.total_seconds * block.repeat_count
                 zone_seconds[code] = zone_seconds.get(code, 0) + step_seconds
-        raw = sum(
-            seconds / 3600 * _TSS_PER_HOUR_MIDPOINT[code] for code, seconds in zone_seconds.items()
-        )
+        raw = 0.0
+        for code, seconds in zone_seconds.items():
+            midpoint = _TSS_PER_HOUR_MIDPOINT.get(code)
+            if midpoint is None:
+                # POWER Z6/Z7: the knowledge base quantifies no TSS/h for
+                # these zones, so they are uncovered, never estimated.
+                continue
+            raw += seconds / 3600 * midpoint
         return round(raw, 1)
+
+    @computed_field
+    @property
+    def tss_uncovered_target_count(self) -> int:
+        """Derived count of step targets that TSS cannot represent (I5).
+
+        Every heart-rate zone step, every RPE step and every POWER step in
+        ``Z6`` or ``Z7`` is a real prescription with no honest TSS figure
+        (TSS is anchored on power, the heart-rate knowledge base quantifies no
+        TSS/h, and the power document states TSS cannot quantify its zones 6
+        and 7), so this reports how many such
+        targets the plan carries — heart-rate, RPE and power Z6/Z7 alike,
+        counted per step
+        instance (a block repeated N times contributes N per step, matching
+        how ``estimated_tss`` aggregates durations). Free-text sessions carry
+        no steps and therefore report 0.
+        """
+        count = 0
+        for block in self.blocks:
+            for step in block.steps:
+                target = step.target
+                if (
+                    isinstance(target, ZoneTarget)
+                    and target.system is TrainingSystem.POWER
+                    and target.zone in _TSS_PER_HOUR_MIDPOINT
+                ):
+                    continue
+                # Heart-rate, RPE, and POWER Z6/Z7 (TSS cannot quantify those
+                # two zones per the power knowledge base) are all uncovered.
+                count += block.repeat_count
+        return count
 
 
 # --- Gym shapes -------------------------------------------------------------------------
