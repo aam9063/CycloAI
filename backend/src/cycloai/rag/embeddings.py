@@ -19,6 +19,7 @@ import asyncio
 import math
 import re
 from collections.abc import Awaitable, Callable
+from pathlib import Path
 
 from google import genai
 from google.genai import types
@@ -42,25 +43,39 @@ _RETRY_DELAY_PATTERN = re.compile(r"retry in ([\d.]+)\s*s", re.IGNORECASE)
 
 EmbedFn = Callable[[list[str]], Awaitable[list[list[float]]]]
 
+# The env file is resolved from THIS module's location, not from the process
+# working directory. A relative ``.env`` silently means ``backend/.env`` when
+# you happen to run from ``backend/`` and the repository-root ``.env`` when you
+# run from the root, so the same command behaved differently depending on
+# where it was launched. Mirrors ``cycloai.db.settings``.
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
+
 
 class EmbedderSettings(BaseSettings):
     """API-key resolution mirroring ``cycloai.db.settings`` conventions.
 
-    Reads the process environment first, then ``backend/.env`` (when the
-    process runs with ``backend/`` as its working directory). The key is
-    never hardcoded and never printed. (``cycloai.db.settings.Settings``
-    currently owns database connectivity only and is not extendable from
-    this module, so the Gemini key lives here with the same env var name the
-    TypeScript original used.)
+    Reads the process environment first, then ``backend/.env``; the env-file
+    path is resolved from this module's location, so key resolution no longer
+    depends on the process working directory. The key is never hardcoded and
+    never printed. (``cycloai.db.settings.Settings`` currently owns database
+    connectivity only and is not extendable from this module, so the Gemini
+    key lives here with the same env var name the TypeScript original used.)
     """
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
     google_api_key: str = Field(default="", validation_alias="GOOGLE_GENERATIVE_AI_API_KEY")
+
+    # Generation model, consumed by ``cycloai.generator.client`` so both the
+    # key and the model name resolve from the same settings/env-file source.
+    generation_model: str = Field(
+        default="gemini-2.5-flash",
+        validation_alias="GEMINI_GENERATION_MODEL",
+    )
 
 
 def parse_retry_delay_ms(message: str) -> int:

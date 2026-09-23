@@ -10,12 +10,21 @@ The URL uses the asyncpg driver form:
 Values are read from the process environment first, then from ``backend/.env``.
 """
 
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The env file is resolved from THIS module's location, not from the process
+# working directory. A relative ``.env`` silently means ``backend/.env`` when you
+# happen to run from ``backend/`` and the repository-root ``.env`` when you run
+# from the root, so the same command behaved differently depending on where it
+# was launched and reported "not configured" for a variable that existed.
+_ENV_FILE = Path(__file__).resolve().parents[3] / ".env"
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_ENV_FILE,
         env_file_encoding="utf-8",
         extra="ignore",
     )
