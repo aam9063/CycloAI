@@ -174,6 +174,108 @@ def test_blank_sources_are_missing_provenance() -> None:
     assert "missing_provenance" in _error_codes(report)
 
 
+# --- I3: citation-subset rule (unretrieved_source) ------------------------------
+
+
+def test_source_outside_citation_set_is_unretrieved_and_named() -> None:
+    payload = _hr_payload()
+    payload["sources"] = [CORPUS_SOURCE, "docs/invented-document.pdf"]
+    report = validate_cycling_payload(payload, citation_set={CORPUS_SOURCE})
+    assert "unretrieved_source" in _error_codes(report)
+    assert not report.ok
+    finding = next(f for f in report.errors if f.code == "unretrieved_source")
+    assert finding.severity is Severity.ERROR
+    # The message must NAME the offending value so a reviewer can see which
+    # citation was invented.
+    assert "docs/invented-document.pdf" in finding.message
+    # The legitimate citation is not flagged.
+    assert all(CORPUS_SOURCE not in f.message for f in report.errors)
+
+
+def test_sources_within_citation_set_produce_no_provenance_error() -> None:
+    payload = _hr_payload()
+    report = validate_cycling_payload(
+        payload, citation_set={CORPUS_SOURCE, "docs/other-chunk.md"}
+    )
+    assert "unretrieved_source" not in _error_codes(report)
+    assert "missing_provenance" not in _error_codes(report)
+
+
+def test_empty_citation_set_with_empty_sources_is_valid() -> None:
+    # The case that must NOT be rejected: nothing was retrieved, so citing
+    # nothing is correct — otherwise every knowledge-less generation fails.
+    payload = _hr_payload()
+    payload["sources"] = []
+    report = validate_cycling_payload(payload, citation_set=set())
+    assert "missing_provenance" not in _error_codes(report)
+    assert "unretrieved_source" not in _error_codes(report)
+    assert report.ok
+
+
+def test_empty_citation_set_with_any_citation_is_fabricated() -> None:
+    payload = _hr_payload()
+    report = validate_cycling_payload(payload, citation_set=set())
+    assert "unretrieved_source" in _error_codes(report)
+    finding = next(f for f in report.errors if f.code == "unretrieved_source")
+    assert CORPUS_SOURCE in finding.message
+
+
+def test_citation_set_none_keeps_previous_non_empty_behaviour() -> None:
+    # No citation_set: a source that was never retrieved is NOT checked and
+    # the legacy non-empty rule alone applies, unchanged.
+    payload = _hr_payload()
+    payload["sources"] = ["docs/never-retrieved.pdf"]
+    report = validate_cycling_payload(payload)
+    assert _error_codes(report) == []
+    # And the legacy missing-provenance behaviour is unchanged.
+    payload["sources"] = []
+    report = validate_cycling_payload(payload)
+    assert "missing_provenance" in _error_codes(report)
+
+
+def test_citation_set_none_with_absent_sources_still_requires_provenance() -> None:
+    payload = _hr_payload()
+    del payload["sources"]
+    report = validate_cycling_payload(payload, citation_set=None)
+    assert "missing_provenance" in _error_codes(report)
+
+
+def test_malformed_sources_do_not_raise_out_of_the_validator() -> None:
+    # 'sources' key absent entirely.
+    report = validate_cycling_payload({"blocks": []}, citation_set={"doc-a"})
+    assert isinstance(report, CyclingValidationReport)
+    assert "missing_provenance" in _error_codes(report)
+    # 'sources' of the wrong type.
+    report = validate_cycling_payload(
+        {"sources": "docs/not-a-list.pdf", "blocks": []}, citation_set={"doc-a"}
+    )
+    assert "missing_provenance" in _error_codes(report)
+    # Non-string entries: they carry no citable value and must not raise.
+    report = validate_cycling_payload(
+        {"sources": ["doc-a", 42], "blocks": []}, citation_set={"doc-a"}
+    )
+    assert "unretrieved_source" not in _error_codes(report)
+
+
+def test_subset_rule_and_non_empty_rule_do_not_contradict() -> None:
+    # Empty set + empty sources: the non-empty rule must NOT fire.
+    payload = _hr_payload()
+    payload["sources"] = []
+    empty_report = validate_cycling_payload(payload, citation_set=set())
+    assert _error_codes(empty_report) == []
+    # Non-empty set + non-member citation: the non-empty rule must NOT mask
+    # (or be masked by) the subset rule — only the subset error fires.
+    payload["sources"] = ["docs/fabricated.pdf"]
+    fabricated_report = validate_cycling_payload(
+        payload, citation_set={CORPUS_SOURCE}
+    )
+    assert {f.code for f in fabricated_report.errors} == {"unretrieved_source"}
+    # Non-empty set + subset citation: both rules satisfied together.
+    payload["sources"] = [CORPUS_SOURCE]
+    ok_report = validate_cycling_payload(payload, citation_set={CORPUS_SOURCE})
+    assert ok_report.errors == []
+
+
 # --- Roles: missing_warmup / missing_cooldown / empty_workout -----------------
 
 

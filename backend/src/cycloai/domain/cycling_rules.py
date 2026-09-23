@@ -28,7 +28,27 @@ Errors (structural/invariant defects):
   legitimate system identifier ``"system": "heart_rate"`` is NOT a magnitude
   and never triggers this rule (guarded by an explicit test).
 - ``missing_provenance`` (I3): ``sources`` absent, empty, or carrying only
-  blank entries.
+  blank entries. Evaluated only when no ``citation_set`` is supplied (see
+  ``unretrieved_source`` below for the conditional asymmetry).
+- ``unretrieved_source`` (I3): a cited ``sources`` value that is not part of
+  the retrieved chunk set supplied as ``citation_set`` — the signature of a
+  fabricated citation. The message names the offending value so a reviewer
+  can see which citation was invented.
+
+  The requirement is deliberately CONDITIONAL on retrievability, which is
+  why it cannot live in the domain model:
+
+  - ``citation_set`` is ``None``: behaviour is exactly the legacy rule —
+    ``sources`` must be non-empty (``missing_provenance`` otherwise).
+  - ``citation_set`` is a non-empty set: every cited source must be a member
+    of it; a non-member is ``unretrieved_source`` and the non-empty rule
+    still applies (a workout must not be citation-free when knowledge was
+    retrieved).
+  - ``citation_set`` is an EMPTY set: nothing was retrieved, so there is no
+    legitimate citation available and ``sources`` must be empty. Any citation
+    is fabricated (``unretrieved_source``); an empty ``sources`` with an
+    empty ``citation_set`` is VALID — "sources must be non-empty" is only
+    true when there was knowledge to cite.
 - ``missing_warmup`` / ``missing_cooldown``: a prescriptive workout whose
   steps include no step (or block) with that role.
 - ``unresolvable_zone``: ONLY evaluated when an
@@ -163,6 +183,28 @@ _NOT_EVALUATED_ZONES = Finding(
     ),
 )
 
+_MISSING_PROVENANCE = Finding(
+    code="missing_provenance",
+    severity=Severity.ERROR,
+    message=(
+        "invariant I3: 'sources' is absent, empty or blank; every "
+        "workout must cite at least one source"
+    ),
+)
+
+
+def _unretrieved_source_finding(entry: str) -> Finding:
+    """Build the ``unretrieved_source`` finding naming the offending citation value."""
+    return Finding(
+        code="unretrieved_source",
+        severity=Severity.ERROR,
+        message=(
+            f"invariant I3: cited source {entry!r} is not part of the "
+            f"retrieved chunk set; citing an unretrieved document is the "
+            f"signature of a fabricated citation"
+        ),
+    )
+
 
 def _magnitude_finding(
     keys: list[str], block_index: int | None, step_index: int | None
@@ -296,22 +338,44 @@ def _payload_structural_errors(payload: Mapping) -> list[Finding]:
     return errors
 
 
-def _provenance_errors(payload: Mapping) -> list[Finding]:
-    sources = payload.get("sources")
-    ok = isinstance(sources, list) and any(
-        isinstance(entry, str) and entry.strip() for entry in sources
-    )
-    if ok:
-        return []
+def _provenance_errors(
+    payload: Mapping, citation_set: set[str] | None
+) -> list[Finding]:
+    """I3 provenance checks, optionally narrowed to the retrieved chunk set.
+
+    Malformed payloads (``sources`` absent, not a list, or carrying non-string
+    entries) never raise here: they are degraded to the legacy non-empty rule
+    (or, for non-string entries, simply carry no citable value).
+    """
+    raw_sources = payload.get("sources")
+    entries = raw_sources if isinstance(raw_sources, list) else None
+    cited = [
+        entry
+        for entry in entries or []
+        if isinstance(entry, str) and entry.strip()
+    ]
+
+    if citation_set is None:
+        # Legacy behaviour, unchanged: non-empty sources required.
+        if cited:
+            return []
+        return [_MISSING_PROVENANCE]
+
+    if not citation_set:
+        # Nothing was retrieved, so there is no legitimate citation: sources
+        # must be empty. Any citation is fabricated; NO citation is valid.
+        return [_unretrieved_source_finding(entry) for entry in cited]
+
+    # Knowledge was retrieved: the non-empty rule still applies AND every
+    # citation must be a member of the retrieved set (the two rules do not
+    # contradict each other — the subset check only narrows WHAT may be
+    # cited, never whether something must be cited).
+    if not cited:
+        return [_MISSING_PROVENANCE]
     return [
-        Finding(
-            code="missing_provenance",
-            severity=Severity.ERROR,
-            message=(
-                "invariant I3: 'sources' is absent, empty or blank; every "
-                "workout must cite at least one source"
-            ),
-        )
+        _unretrieved_source_finding(entry)
+        for entry in cited
+        if entry not in citation_set
     ]
 
 
@@ -361,7 +425,10 @@ def _zone_errors_and_warnings(
 
 
 def validate_cycling_payload(
-    payload: Mapping, *, thresholds: AthleteThresholds | None = None
+    payload: Mapping,
+    *,
+    thresholds: AthleteThresholds | None = None,
+    citation_set: set[str] | None = None,
 ) -> CyclingValidationReport:
     """Validate a RAW generator payload (before domain-model parsing).
 
@@ -372,6 +439,17 @@ def validate_cycling_payload(
 
     When ``thresholds`` is omitted, zone resolvability is recorded in
     ``not_evaluated`` instead of passing silently.
+
+    ``citation_set`` is the set of retrieved citation identifiers. It is
+    ``None`` by default, which keeps the legacy non-empty-sources rule
+    unchanged. When supplied, every cited source must be a member of it
+    (``unretrieved_source`` error naming the offending value); when it is an
+    EMPTY set, nothing was retrievable, so ``sources`` must be empty and any
+    citation is fabricated. The asymmetry is deliberate: "sources must be
+    non-empty" is only true when there was knowledge to cite, which is why
+    this rule is conditional on retrievability and cannot live in the domain
+    model (the model would make non-empty sources unconditional and reject
+    every knowledge-less generation).
     """
     errors: list[Finding] = []
     warnings: list[Finding] = []
@@ -379,7 +457,7 @@ def validate_cycling_payload(
 
     _scan_magnitudes(payload, None, None, None, errors)
 
-    errors.extend(_provenance_errors(payload))
+    errors.extend(_provenance_errors(payload, citation_set))
     errors.extend(_payload_structural_errors(payload))
 
     if thresholds is None:

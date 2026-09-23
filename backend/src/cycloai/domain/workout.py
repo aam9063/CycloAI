@@ -255,7 +255,18 @@ _TSS_PER_HOUR_MIDPOINT: dict[ZoneCode, float] = {
 
 
 class CyclingWorkout(BaseModel):
-    """A cycling session, either prescriptive (structured blocks) or free text (I6)."""
+    """A cycling session, either prescriptive (structured blocks) or free text (I6).
+
+    ``sources`` is required but MAY be empty: a model enforces what is ALWAYS
+    true, while a requirement that depends on context belongs in the validator
+    that has the context. "sources must be non-empty" is only true when there
+    was knowledge to cite, and that depends on the retrieval, which the domain
+    model cannot see. Keeping it strict here forced callers to choose between
+    failing every knowledge-less generation and fabricating a placeholder
+    citation — and fabricating one violates the very invariant the field exists
+    to serve. The type is still ``list[str]`` so a non-string element is
+    rejected here regardless of context.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
@@ -268,7 +279,7 @@ class CyclingWorkout(BaseModel):
     freeform_duration_s: Annotated[int | None, Field(gt=0)] = None
     blocks: list[CyclingBlock] = []
     notes: str | None = None
-    sources: Annotated[list[str], Field(min_length=1)]
+    sources: list[str]
 
     @model_validator(mode="after")
     def _enforce_workout_shape(self) -> CyclingWorkout:

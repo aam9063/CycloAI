@@ -81,6 +81,26 @@ class KnowledgeRow:
     score: float = 0.0
 
 
+@dataclass(frozen=True)
+class RetrievedKnowledge:
+    """ONE retrieval result carrying BOTH the display text and the citable ids.
+
+    This object is the deliberate single source of truth for the generator:
+    the prompt text is built from ``text`` and the citation set the raw
+    payload gate checks is ``citation_ids``, derived from the very same rows
+    in the very same pass. A display set that differs from the checked set is
+    exactly how the original bug happened — the prompt rendered chunks under
+    ``metadata.title`` while the gate checked ``source_file`` values, so the
+    model was asked to cite something it was NEVER shown and every honest
+    citation was rejected as unretrieved. Passing one of these objects to
+    both the prompt builder and the gate makes that drift structurally
+    impossible.
+    """
+
+    text: str
+    citation_ids: frozenset[str]
+
+
 def parse_pgvector_text(raw: str) -> list[float]:
     """Parse pgvector's text form (``"[0.1,0.2,...]"``) into floats.
 
@@ -93,25 +113,29 @@ def parse_pgvector_text(raw: str) -> list[float]:
     return [float(part) for part in raw[1:-1].split(",")]
 
 
-def format_chunks(rows: list[KnowledgeRow]) -> str:
-    """Format knowledge rows into a plain-text block for the system prompt.
+def _format_blocks(
+    rows: list[KnowledgeRow], *, show_citation: bool
+) -> tuple[list[str], list[str]]:
+    """Render chunk blocks (and their citable ids) under the whole-chunk cap.
 
-    Per chunk::
+    Per chunk the readable title is ``metadata.title``, falling back to
+    ``metadata.source_file`` and then to ``Fragmento N`` (the row's 1-based
+    position among the RENDERED blocks). With ``show_citation`` the block
+    additionally states the CITABLE identifier on its own line — the exact
+    string the generator's gate will accept in ``sources``. The citable
+    identifier is ``source_file`` when present, else ``title``, else the same
+    synthetic ``Fragmento N`` label: every displayed chunk is citable with a
+    string that is shown verbatim, so what the model sees and what the gate
+    checks cannot drift apart. Chunks are joined by the caller.
 
-        [Conocimiento N — {title}]
-        {content}
-
-    Chunks are joined with ``\\n\\n---\\n\\n``. Truncation is whole-chunk only:
-    once adding the next block would exceed :data:`MAX_RAG_CHARS` the loop
-    stops (no mid-chunk splits). The FIRST chunk is always allowed through
-    even if it alone exceeds the cap (avoids returning empty on an oversized
-    single result). ``title`` falls back to ``metadata.source_file`` and then
-    to ``Fragmento N``. Returns ``''`` when rows is empty.
+    Truncation is whole-chunk only: once adding the next block would exceed
+    :data:`MAX_RAG_CHARS` the loop stops (no mid-chunk splits). The FIRST
+    chunk is always allowed through even if it alone exceeds the cap (avoids
+    returning empty on an oversized single result). A row dropped by the cap
+    contributes neither a block nor a citation id.
     """
-    if not rows:
-        return ""
-
     blocks: list[str] = []
+    citation_ids: list[str] = []
     used = 0
 
     for row in rows:
@@ -122,7 +146,22 @@ def format_chunks(rows: list[KnowledgeRow]) -> str:
             title = row.metadata.get("source_file")
         if title is None:
             title = f"Fragmento {len(blocks) + 1}"
-        block = f"[Conocimiento {len(blocks) + 1} — {title}]\n{row.content}"
+        position = len(blocks) + 1
+        citation_id = row.metadata.get("source_file")
+        if citation_id is None:
+            citation_id = row.metadata.get("title")
+        if citation_id is None:
+            citation_id = f"Fragmento {position}"
+        citation_id = str(citation_id)
+
+        if show_citation:
+            block = (
+                f"[Conocimiento {position} — {title}]\n"
+                f"fuente citable: {citation_id}\n"
+                f"{row.content}"
+            )
+        else:
+            block = f"[Conocimiento {position} — {title}]\n{row.content}"
 
         # Whole-chunk cap: never split mid-chunk. Allow the FIRST chunk
         # through even if it alone exceeds the cap.
@@ -130,9 +169,48 @@ def format_chunks(rows: list[KnowledgeRow]) -> str:
             break
 
         blocks.append(block)
+        citation_ids.append(citation_id)
         used += len(block)
 
+    return blocks, citation_ids
+
+
+def format_chunks(rows: list[KnowledgeRow]) -> str:
+    """Format knowledge rows into a plain-text block for the system prompt.
+
+    Per chunk::
+
+        [Conocimiento N — {title}]
+        {content}
+
+    Chunks are joined with ``\\n\\n---\\n\\n``. Truncation and title fallbacks
+    are defined by :func:`_format_blocks`. This is the LEGACY chat-path
+    renderer: it does NOT show the citable identifier, so it must never feed
+    a prompt that asks the model to cite sources — use
+    :func:`render_retrieved_knowledge` for that. Returns ``''`` when rows is
+    empty.
+    """
+    blocks, _ = _format_blocks(rows, show_citation=False)
     return "\n\n---\n\n".join(blocks)
+
+
+def render_retrieved_knowledge(rows: list[KnowledgeRow]) -> RetrievedKnowledge:
+    """Render rows into the generator's ONE retrieval result (text + citable ids).
+
+    This is the GENERATOR-path renderer and the only one that may back a
+    prompt asking the model to cite sources: the rendered blocks display each
+    chunk's citable identifier verbatim (``fuente citable: ...``) and the
+    returned :class:`RetrievedKnowledge` carries exactly those identifiers as
+    ``citation_ids``. The generator builds the prompt from ``text`` and hands
+    ``citation_ids`` to the raw-payload gate, so the displayed set and the
+    checked set are the same data by construction — see
+    :class:`RetrievedKnowledge` for why that single source of truth is
+    deliberate. Returns an empty-text/empty-id object when rows is empty.
+    """
+    blocks, citation_ids = _format_blocks(rows, show_citation=True)
+    return RetrievedKnowledge(
+        text="\n\n---\n\n".join(blocks), citation_ids=frozenset(citation_ids)
+    )
 
 
 class GeminiQueryEmbedder:

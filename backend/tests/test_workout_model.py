@@ -497,9 +497,19 @@ def test_sport_is_locked_to_cycling() -> None:
         make_prescriptive_workout(sport="running")
 
 
-def test_sources_are_required() -> None:
+def test_sources_may_be_empty_but_elements_must_be_strings() -> None:
+    """A model enforces what is ALWAYS true; "sources must be non-empty" is
+    only true when there was knowledge to cite, which depends on the retrieval
+    the domain model cannot see. The old non-empty requirement forced callers
+    to choose between failing every knowledge-less generation and fabricating
+    a placeholder citation, so the empty case is accepted here and the
+    contextual requirement belongs in the validator that has the retrieval.
+    What stays enforced: elements must be strings, so a non-string element is
+    still a validation error."""
+    workout = make_prescriptive_workout(sources=[])
+    assert workout.sources == []
     with pytest.raises(ValidationError):
-        make_prescriptive_workout(sources=[])
+        make_prescriptive_workout(sources=[42])
 
 
 # --- Gym shapes ---
