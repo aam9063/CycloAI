@@ -22,6 +22,7 @@ from cycloai.domain.workout import (
     StepRole,
     TrainingPlan,
     TrainingSystem,
+    ZoneCap,
     ZoneTarget,
 )
 
@@ -119,7 +120,7 @@ def make_free_text_workout(**overrides) -> CyclingWorkout:
         "name": "Rodaje suave",
         "objective": "Easy spin",
         "prescriptive": False,
-        "zone_cap": "Z2",
+        "zone_cap": {"system": "heart_rate", "zone": "Z2"},
         "freeform_duration_s": 7200,
         "blocks": [],
         "notes": "SOLO DARSE UN PASEO. NADA DE FORZAR, NO PASAR DE Z2",
@@ -459,8 +460,45 @@ def test_i6_free_text_session_is_representable() -> None:
     workout = make_free_text_workout()
     assert workout.total_duration_s == 7200
     assert workout.estimated_tss == 0.0
-    assert workout.zone_cap.value == "Z2"
+    assert workout.zone_cap is not None
+    assert workout.zone_cap.system is TrainingSystem.HEART_RATE
+    assert workout.zone_cap.zone.value == "Z2"
     assert workout.blocks == []
+
+
+# --- Invariant I2 on the free-text cap: the cap carries its training system ---
+
+
+def test_i2_bare_zone_cap_code_is_lifted_to_the_heart_rate_system() -> None:
+    """The legacy bare-code cap form (the corpus and the generator prompt still
+    emit it) lifts onto an explicit HEART_RATE pair: the corpus is heart-rate
+    anchored, the same default that anchors ``zone_from_label``. The lift
+    never leaves a bare, uninterpretable code on the model."""
+    workout = make_free_text_workout(zone_cap="Z2")
+    assert workout.zone_cap == ZoneCap(system=TrainingSystem.HEART_RATE, zone="Z2")
+
+
+def test_i2_zone_cap_accepts_the_explicit_power_pair() -> None:
+    workout = make_free_text_workout(zone_cap={"system": "power", "zone": "Z4"})
+    assert workout.zone_cap == ZoneCap(system=TrainingSystem.POWER, zone="Z4")
+
+
+@pytest.mark.parametrize(
+    "cap",
+    [
+        {"system": "heart_rate", "zone": "Z6"},  # power-only code
+        {"system": "power", "zone": "Z5A"},  # heart-rate-only code
+        {"system": "heart_rate", "zone": "Z8"},  # not in any vocabulary
+    ],
+)
+def test_i2_zone_cap_rejects_pairs_outside_the_closed_vocabulary(cap: dict) -> None:
+    with pytest.raises(ValidationError):
+        make_free_text_workout(zone_cap=cap)
+
+
+def test_i2_zone_cap_rejects_unknown_extras() -> None:
+    with pytest.raises(ValidationError):
+        make_free_text_workout(zone_cap={"system": "heart_rate", "zone": "Z2", "pct": 90})
 
 
 @pytest.mark.parametrize(

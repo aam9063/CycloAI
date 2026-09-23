@@ -7,10 +7,10 @@ Structural invariants enforced here (feature doc section 3.1):
   RPE is a perceived-exertion scale, not an athlete-specific absolute value, so it
   does not violate I1. The schema forbids unknown extras, so no bpm/watts field
   can be smuggled in.
-- I2: zone targets carry a (system, code) pair from the closed vocabularies
-  defined in ``cycloai.domain.zones``; the two training systems (power/%FTP
-  and heart-rate/%LTHR) are not interchangeable and a code alone is never
-  enough.
+- I2: zone targets and free-text zone caps carry a (system, code) pair from
+  the closed vocabularies defined in ``cycloai.domain.zones``; the two
+  training systems (power/%FTP and heart-rate/%LTHR) are not interchangeable
+  and a code alone is never enough.
 - I5: ``total_duration_s`` and ``estimated_tss`` are computed fields derived from
   the structure; they are not caller-supplied inputs.
 - I6: ``prescriptive: false`` is a first-class shape for free-text sessions: a zone
@@ -22,7 +22,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from cycloai.domain.zones import ZONES, TrainingSystem, ZoneCode
 
@@ -48,6 +48,7 @@ __all__ = [
     "StepTarget",
     "TrainingPlan",
     "TrainingSystem",
+    "ZoneCap",
     "ZoneCode",
     "ZoneTarget",
 ]
@@ -119,6 +120,21 @@ StepDuration = Annotated[
 # --- Cycling: steps, blocks, workouts ---------------------------------------------------
 
 
+def _require_zone_pair(system: TrainingSystem, code: ZoneCode) -> None:
+    """Shared (system, code) pair validation against the closed vocabulary.
+
+    One validator, two consumers: :class:`ZoneTarget` step targets and
+    :class:`ZoneCap` free-text session caps must both reject a pair that does
+    not exist in ``cycloai.domain.zones.ZONES`` (power-only codes such as
+    ``Z5``-``Z7`` outside the power system, heart-rate-only codes such as
+    ``Z5A``-``Z5C`` outside the heart-rate system).
+    """
+    if (system, code) not in ZONES:
+        raise ValueError(
+            f"zone {code.value} does not exist in the {system.value} training system"
+        )
+
+
 class ZoneTarget(BaseModel):
     """Zone step target: a (system, code) pair plus optional free-text intent (I1).
 
@@ -143,11 +159,35 @@ class ZoneTarget(BaseModel):
 
     @model_validator(mode="after")
     def _enforce_system_code_pair(self) -> ZoneTarget:
-        if (self.system, self.zone) not in ZONES:
-            raise ValueError(
-                f"zone {self.zone.value} does not exist in the {self.system.value} "
-                f"training system"
-            )
+        _require_zone_pair(self.system, self.zone)
+        return self
+
+
+class ZoneCap(BaseModel):
+    """Free-text session zone cap as a (system, code) pair (I2, I6).
+
+    The same defect class T9 removed from :class:`ZoneTarget`: a cap of ``Z4``
+    cannot be interpreted without a training system (91-105 %FTP versus
+    94-99 %LTHR), so the cap carries its system explicitly and the pair must
+    exist in ``cycloai.domain.zones.ZONES`` (shared validation with
+    :class:`ZoneTarget`; nothing computes with the cap today, which is exactly
+    why the ambiguity is cheap to remove now and expensive to find later).
+
+    ``system`` is REQUIRED here with no default, mirroring :class:`ZoneTarget`:
+    a default would silently re-create the flat-vocabulary conflation. The
+    legacy bare-code form is still accepted at the :class:`CyclingWorkout`
+    boundary (see :meth:`CyclingWorkout._lift_bare_zone_cap`), where it is
+    lifted into an explicit HEART_RATE pair.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    system: TrainingSystem
+    zone: ZoneCode
+
+    @model_validator(mode="after")
+    def _enforce_system_code_pair(self) -> ZoneCap:
+        _require_zone_pair(self.system, self.zone)
         return self
 
 
@@ -275,11 +315,29 @@ class CyclingWorkout(BaseModel):
     sport: Literal["cycling"] = "cycling"
     objective: str
     prescriptive: bool = True
-    zone_cap: ZoneCode | None = None
+    zone_cap: ZoneCap | None = None
     freeform_duration_s: Annotated[int | None, Field(gt=0)] = None
     blocks: list[CyclingBlock] = []
     notes: str | None = None
     sources: list[str]
+
+    @field_validator("zone_cap", mode="before")
+    @classmethod
+    def _lift_bare_zone_cap(cls, value: object) -> object:
+        """Lift the legacy bare-code cap form onto an explicit (system, code) pair.
+
+        The measured corpus is HEART-RATE anchored (see
+        ``cycloai.domain.zones``: the same default anchors ``zone_from_label``),
+        and the current generator prompt still emits the bare form
+        ``"zone_cap": "<código de zona>"``, so a bare cap resolves EXPLICITLY
+        in the heart-rate system at the model boundary instead of staying an
+        ambiguous code. Callers prescribing a power cap pass the explicit pair
+        ``{"system": "power", "zone": ...}``. The lift supplies the system; it
+        never guesses the code, which :class:`ZoneCap` validates.
+        """
+        if isinstance(value, str):
+            return {"system": TrainingSystem.HEART_RATE, "zone": value}
+        return value
 
     @model_validator(mode="after")
     def _enforce_workout_shape(self) -> CyclingWorkout:
