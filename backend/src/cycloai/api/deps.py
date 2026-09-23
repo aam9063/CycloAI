@@ -1,23 +1,30 @@
 """Request-scoped dependencies for the CycloAI API.
 
-This module owns the **authentication seam** between phase P4b (this slice)
-and phase P5 (real authentication). Everything here is deliberately lazy:
-constructing a model client or an engine happens at request time, never at
-import time, so the app can be imported and built in tests with no database
-URL and no API key configured.
+This module owns the **authentication seam**,
+:func:`get_current_athlete`: it resolves the caller's identity and nothing
+else. The identity comes ONLY from the session cookie, verified by the
+``cycloai.auth.security`` core (JWT, HS256, pinned algorithm). Nothing in the
+request body, the query string or the headers may influence it.
 
-The production guard
---------------------
+Session-cookie contract
+-----------------------
 
-The development stub below is guarded by the explicit environment flag
-``CYCLOAI_ENV``:
+The signed session token is delivered in the cookie named
+:data:`AUTH_COOKIE_NAME` with:
 
-* unset, ``development``, ``local``, ``test`` → the stub is served;
-* ``production`` (case-insensitive) → the stub REFUSES to run and raises.
+* ``httponly`` — never readable from JavaScript;
+* ``SameSite=Lax`` — sent on top-level navigations, not cross-site posts;
+* ``path=/`` — valid across the whole API;
+* an explicit ``max_age`` equal to the access-token lifetime
+  (:data:`~cycloai.auth.security.ACCESS_TOKEN_TTL`);
+* ``Secure`` enabled exactly when ``CYCLOAI_ENV`` is ``production``
+  (case-insensitive) — see :func:`auth_cookie_secure`. Every other value
+  (unset, ``development``, ``local``, ``test``) leaves ``Secure`` off so the
+  cookie works over plain HTTP locally.
 
-The flag is documented here and in the deployment runbook: setting
-``CYCLOAI_ENV=production`` before phase P5 lands must fail loudly, never
-silently serve unauthenticated requests.
+Everything here remains deliberately lazy: constructing a model client or an
+engine happens at request time, never at import time, so the app can be
+imported and built in tests with no database URL and no API key configured.
 """
 
 from __future__ import annotations
@@ -25,10 +32,11 @@ from __future__ import annotations
 import logging
 import os
 import uuid
-from collections.abc import AsyncIterator
+from typing import Final
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, Request, Response, status
 
+from cycloai.auth.security import ACCESS_TOKEN_TTL, verify_token
 from cycloai.db.engine import get_engine
 from cycloai.generator.client import GeminiGeneratorClient
 from cycloai.generator.generate import EMPTY_KNOWLEDGE, ModelClient, RetrieveFn
@@ -40,11 +48,16 @@ from cycloai.rag.retrieval import (
 )
 
 __all__ = [
-    "DEVELOPMENT_STUB_ATHLETE_ID",
+    "AUTH_COOKIE_MAX_AGE_SECONDS",
+    "AUTH_COOKIE_NAME",
+    "UNAUTHENTICATED_DETAIL",
+    "auth_cookie_secure",
+    "clear_auth_cookie",
     "get_current_athlete",
     "get_model_client",
     "get_retrieve",
     "get_session",
+    "set_auth_cookie",
 ]
 
 # Re-exported so routes depend on this module for every request-scoped
@@ -54,48 +67,95 @@ from cycloai.db.engine import get_session as get_session  # noqa: E402
 
 logger = logging.getLogger("cycloai.api")
 
-#: Values of ``CYCLOAI_ENV`` under which the development stub may be served.
-_STUB_ALLOWED_ENVS = frozenset({"", "development", "local", "test"})
+# ---------------------------------------------------------------------------
+# Session cookie
+# ---------------------------------------------------------------------------
 
-#: Fixed identity served by the development stub. It exists ONLY so the
-#: request path can exercise the ownership guard (session binding + profile
-#: repository) before real authentication exists. It is not a real athlete
-#: and must never be trusted as one.
-DEVELOPMENT_STUB_ATHLETE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000d3")
+#: The (single) name of the session cookie. Both the seam that READS it and
+#: the routes that SET/CLEAR it must use this constant — never a repeated
+#: string literal.
+AUTH_COOKIE_NAME: Final[str] = "cycloai_session"
+
+#: Explicit cookie lifetime, matching the access-token lifetime exactly: the
+#: cookie and the token inside it expire together.
+AUTH_COOKIE_MAX_AGE_SECONDS: Final[int] = int(ACCESS_TOKEN_TTL.total_seconds())
+
+#: Values of ``CYCLOAI_ENV`` for which the cookie is marked ``Secure``.
+_PRODUCTION_ENVS: Final[frozenset[str]] = frozenset({"production"})
+
+#: One generic unauthenticated message for every rejected credential state.
+#: Missing, malformed, expired and wrongly-signed tokens all look the same to
+#: the caller: a distinct message per failure mode would only help attackers.
+UNAUTHENTICATED_DETAIL: Final[str] = "Authentication required."
 
 
-async def get_current_athlete() -> AsyncIterator[uuid.UUID]:
-    """Yield the identity of the authenticated athlete for this request.
+def auth_cookie_secure() -> bool:
+    """Whether the session cookie must carry the ``Secure`` attribute.
 
-    **THIS IS NOT AN AUTHORIZATION MECHANISM.** This dependency is a
-    development stub only. It performs no credential check, no token
-    validation, and no identity verification of any kind: it returns a fixed
-    development identity so the request path can be wired end to end before
-    phase P5. Real authentication (P5) replaces exactly this one function —
-    and until it does, anyone who can reach the API gets the stub identity.
-
-    Guard: when the environment flag ``CYCLOAI_ENV`` is ``production``, the
-    stub refuses to run and raises, so a misconfigured production deployment
-    can never silently serve unauthenticated requests.
-
-    Yields:
-        A fixed development athlete id (see
-        :data:`DEVELOPMENT_STUB_ATHLETE_ID`).
-
-    Raises:
-        RuntimeError: if ``CYCLOAI_ENV`` is ``production`` — the stub must
-            never serve in production; real authentication (P5) is required.
+    ``Secure`` is enabled exactly when the environment is production, read
+    from the same ``CYCLOAI_ENV`` flag the codebase already uses, compared
+    case-insensitively on the stripped value.
     """
     env = os.environ.get("CYCLOAI_ENV", "").strip().lower()
-    if env not in _STUB_ALLOWED_ENVS:
-        raise RuntimeError(
-            "CYCLOAI_ENV="
-            f"{os.environ.get('CYCLOAI_ENV')!r} refuses the development "
-            "authentication stub: real authentication (phase P5) must be "
-            "installed before the API may serve in this environment. The "
-            "stub performs NO credential verification."
+    return env in _PRODUCTION_ENVS
+
+
+def set_auth_cookie(response: Response, token: str) -> None:
+    """Attach the session cookie (httponly, Lax, path=/, explicit max_age)."""
+    response.set_cookie(
+        key=AUTH_COOKIE_NAME,
+        value=token,
+        max_age=AUTH_COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        samesite="lax",
+        path="/",
+        secure=auth_cookie_secure(),
+    )
+
+
+def clear_auth_cookie(response: Response) -> None:
+    """Expire the session cookie with the same attributes it was set with."""
+    response.delete_cookie(
+        key=AUTH_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        samesite="lax",
+        secure=auth_cookie_secure(),
+    )
+
+
+# ---------------------------------------------------------------------------
+# The authentication seam
+# ---------------------------------------------------------------------------
+
+
+async def get_current_athlete(request: Request) -> uuid.UUID:
+    """Resolve the identity of the authenticated athlete for this request.
+
+    The identity comes ONLY from the session token carried in the
+    :data:`AUTH_COOKIE_NAME` cookie, verified through the auth core
+    (:func:`cycloai.auth.security.verify_token`). Nothing in the request
+    body, the query string or the headers may influence the result: the
+    request object is used solely to read the cookie, and no other request
+    data is ever consulted.
+
+    Failure mapping: a missing, malformed, expired or otherwise unverifiable
+    token is an UNAUTHENTICATED request, not a server error. The auth core
+    deliberately returns ``None`` instead of raising for every verification
+    failure, and this dependency respects that: ``None`` — and only an
+    absent/failed verification — maps to a generic ``401`` response. No
+    exception ever escapes as a ``500`` for a bad credential, and every
+    failure mode returns the same generic detail so failure modes cannot be
+    enumerated.
+    """
+    token = request.cookies.get(AUTH_COOKIE_NAME)
+    identity = verify_token(token) if token else None
+    if identity is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=UNAUTHENTICATED_DETAIL,
         )
-    yield DEVELOPMENT_STUB_ATHLETE_ID
+    return identity
 
 
 async def get_model_client() -> ModelClient:
@@ -149,4 +209,3 @@ async def get_retrieve() -> RetrieveFn:
         return render_retrieved_knowledge(rows)
 
     return retrieve
-

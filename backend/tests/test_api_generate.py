@@ -31,7 +31,6 @@ from fastapi.testclient import TestClient
 from cycloai.api import routes_generate
 from cycloai.api.app import create_app
 from cycloai.api.deps import (
-    DEVELOPMENT_STUB_ATHLETE_ID,
     get_current_athlete,
     get_model_client,
     get_retrieve,
@@ -43,9 +42,10 @@ from cycloai.generator.generate import (
     RetrievedKnowledge,
 )
 
-# The identity the auth seam serves. The body's smuggled id MUST differ from
-# it, or the binding assertion below would pass for the wrong reason.
-SEAM_ATHLETE_ID = DEVELOPMENT_STUB_ATHLETE_ID
+# The identity the auth seam serves in these tests. The body's smuggled id
+# MUST differ from it, or the binding assertion below would pass for the
+# wrong reason.
+SEAM_ATHLETE_ID = uuid.UUID("00000000-0000-0000-0000-0000000000d3")
 SMUGGLED_ATHLETE_ID = uuid.UUID("99999999-9999-9999-9999-999999999999")
 assert SMUGGLED_ATHLETE_ID != SEAM_ATHLETE_ID
 
@@ -154,9 +154,9 @@ def make_client(
     app = create_app()
 
     async def fake_seam() -> AsyncIterator[uuid.UUID]:
-        # The production seam is an async GENERATOR dependency (it uses
-        # yield), so the override must yield too — an override that returns
-        # would not exercise the same dependency shape.
+        # The production seam is a plain coroutine dependency (no teardown
+        # needed: it reads the cookie and raises or returns), so the override
+        # is one too. Either shape works for FastAPI overrides.
         yield SEAM_ATHLETE_ID
 
     async def fake_session() -> AsyncIterator[object]:

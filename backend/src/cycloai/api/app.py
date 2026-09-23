@@ -11,17 +11,19 @@ from __future__ import annotations
 
 from fastapi import FastAPI
 
+from cycloai.api.routes_auth import router as auth_router
 from cycloai.api.routes_generate import router as generate_router
 
 __all__ = ["create_app"]
 
 
 def create_app() -> FastAPI:
-    """Build the FastAPI application with the generation router mounted."""
+    """Build the FastAPI application with the auth and generation routers."""
     app = FastAPI(
         title="CycloAI API",
         description="Cycling workout generation with validated, athlete-owned plans.",
         version="0.1.0",
     )
+    app.include_router(auth_router)
     app.include_router(generate_router)
     return app
