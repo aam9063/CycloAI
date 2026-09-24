@@ -3,6 +3,12 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
+// Login lives in `app/api/auth/login/route.ts` now: the backend answers
+// with `Set-Cookie`, and the session cookie must be forwarded to the browser
+// VERBATIM through a route handler — a server action can only re-issue it,
+// which would risk a weaker cookie (mis-declared HttpOnly/SameSite/Secure/
+// Max-Age) silently replacing the one the backend emitted.
+
 export type FieldErrors = {
   name?: string;
   email?: string;
@@ -66,56 +72,6 @@ function validatePassword(password: string, isRegister = false): string | null {
   if (isRegister && password.length < 6)
     return "La contraseña debe tener al menos 6 caracteres.";
   return null;
-}
-
-export async function loginAction(
-  _prev: AuthResult,
-  formData: FormData
-): Promise<AuthResult> {
-  const email = (formData.get("email") as string | null) ?? "";
-  const password = (formData.get("password") as string | null) ?? "";
-
-  // Collect per-field validation errors before hitting Supabase.
-  const fieldErrors: FieldErrors = {};
-  const emailError = validateEmail(email);
-  if (emailError) fieldErrors.email = emailError;
-  const passwordError = validatePassword(password);
-  if (passwordError) fieldErrors.password = passwordError;
-  if (Object.keys(fieldErrors).length > 0) {
-    return { error: null, fieldErrors };
-  }
-
-  const supabase = await createClient();
-
-  let redirectTo = "/chat";
-
-  try {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) return { error: mapAuthError(error) };
-
-    // Read onboarding status to decide redirect destination.
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("onboarding_completed")
-        .eq("id", user.id)
-        .single();
-
-      if (!profile?.onboarding_completed) {
-        redirectTo = "/onboarding";
-      }
-    }
-  } catch (err) {
-    return { error: mapAuthError(err) };
-  }
-
-  // redirect() MUST be called outside try/catch — Next throws NEXT_REDIRECT
-  // internally and a catch block would swallow it.
-  redirect(redirectTo);
 }
 
 export async function registerAction(
