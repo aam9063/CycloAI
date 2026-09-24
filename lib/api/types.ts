@@ -128,6 +128,21 @@ export interface MessageCreate {
 }
 
 // ---------------------------------------------------------------------------
+// Chat — routes_chat.py (ChatContextOut)
+// ---------------------------------------------------------------------------
+
+/**
+ * One chat turn's context (`POST /chat/context`): the assembled prompt, the
+ * conversation id (created when absent) and whether knowledge was used.
+ * Deliberately minimal — mirrors backend `ChatContextOut`.
+ */
+export interface ChatContextResponse {
+  conversation_id: string;
+  system_prompt: string;
+  knowledge_used: boolean;
+}
+
+// ---------------------------------------------------------------------------
 // Generation — routes_generate.py
 // ---------------------------------------------------------------------------
 

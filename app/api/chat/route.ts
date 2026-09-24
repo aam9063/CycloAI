@@ -3,11 +3,9 @@ import 'server-only';
 import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
 import { createClient } from '@/lib/supabase/server';
-import { buildSystemPrompt } from '@/lib/ai/system-prompt';
-import { searchKnowledgeBase } from '@/lib/ai/rag';
-import { getUserProfile, createConversation, getConversation } from '@/lib/db/conversations';
 import { appendUserMessage, appendAssistantMessage } from '@/lib/db/messages';
-import { ApiError } from '@/lib/api/server';
+import { ApiError, serverPost } from '@/lib/api/server';
+import type { ChatContextResponse } from '@/lib/api/types';
 import { getClientIp, checkRateLimit } from '@/lib/utils/ratelimit';
 import { uiMessageText } from '@/lib/chat/text';
 
@@ -49,15 +47,13 @@ export async function POST(req: Request) {
     return new Response('Solicitud demasiado grande.', { status: 400 });
   }
 
-  // 4. Load user profile (needed for system prompt)
-  const profile = await getUserProfile(supabase, user.id);
-  if (!profile) {
-    return new Response('Perfil no encontrado', { status: 500 });
-  }
+  // 4. Assemble the turn's context via the backend (POST /chat/context).
+  // The backend builds the system prompt from the athlete's REAL profile plus
+  // knowledge-base retrieval, and resolves or creates the conversation (owner-
+  // checked; a missing id and a foreign id are the same generic 404). The
+  // response shape is `ChatContextResponse` (lib/api/types.ts), mirroring
+  // backend ChatContextOut (routes_chat.py).
 
-  // 5. Resolve conversation (verify ownership via the backend, or create one).
-  // The backend enforces ownership itself: a missing id and a foreign id are
-  // the same generic 404, so both map to this single 404 response.
   const lastUserMessage = messages[messages.length - 1];
   const lastText = uiMessageText(lastUserMessage);
 
@@ -67,22 +63,25 @@ export async function POST(req: Request) {
   }
 
   let convId: string;
+  let systemPrompt: string;
   try {
-    if (conversationId) {
-      const conversation = await getConversation(conversationId);
-      if (!conversation) {
+    const context = await serverPost<ChatContextResponse>('/chat/context', {
+      message: lastText,
+      conversation_id: conversationId ?? null,
+    });
+    convId = context.conversation_id;
+    systemPrompt = context.system_prompt;
+  } catch (err) {
+    if (err instanceof ApiError) {
+      // 401: unauthenticated backend session — same response as the route's
+      // other auth failures. 404: missing or foreign conversation, the same
+      // generic 404 the route already produced for a missing conversation.
+      if (err.status === 401) {
+        return new Response('No autorizado', { status: 401 });
+      }
+      if (err.status === 404) {
         return new Response('Conversación no encontrada', { status: 404 });
       }
-      convId = conversation.id;
-    } else {
-      // The backend truncates the title to 60 chars on a word boundary,
-      // exactly like the old client-side truncateTitle.
-      const created = await createConversation(lastText);
-      convId = created.id;
-    }
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 401) {
-      return new Response('No autorizado', { status: 401 });
     }
     throw err;
   }
@@ -98,12 +97,9 @@ export async function POST(req: Request) {
     return new Response('Error interno', { status: 500 });
   }
 
-  // 7. Retrieve RAG context then build system prompt.
-  // searchKnowledgeBase returns '' on any failure — RAG is additive, never blocking.
-  // Adds ~100-250ms (embed + RPC) before first token; sequential by design (system prompt
-  // must be fully formed before streaming begins).
-  const ragContext = await searchKnowledgeBase(lastText);
-  const systemPrompt = buildSystemPrompt(profile, ragContext);
+  // 7. The system prompt came from the backend context call above (step 4):
+  // built from the athlete's real profile plus knowledge retrieval, with
+  // `knowledge_used` reporting whether retrieval contributed anything.
 
   // 8. Stream via Gemini 3.5 Flash
   const modelMessages = await convertToModelMessages(messages);
