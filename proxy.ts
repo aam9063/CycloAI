@@ -12,9 +12,8 @@ export const config = {
      *   - _next/static  (static assets)
      *   - _next/image   (image optimization)
      *   - favicon.ico
-     *   - auth/callback (CRITICAL: must be excluded to avoid redirect loop)
      *   - files with a known static extension (svg, png, jpg, etc.)
      */
-    "/((?!_next/static|_next/image|favicon\\.ico|auth/callback|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
   ],
 };
