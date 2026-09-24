@@ -1,8 +1,8 @@
-import { updateSession } from "@/lib/supabase/middleware";
+import { sessionGate } from "@/lib/api/middleware";
 import type { NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
-  return updateSession(request);
+  return sessionGate(request);
 }
 
 export const config = {
