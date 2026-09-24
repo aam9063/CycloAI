@@ -116,7 +116,13 @@ export async function POST(request: Request): Promise<NextResponse> {
       const profile = (await profileResponse.json()) as {
         onboarding_completed?: boolean;
       };
-      if (profile.onboarding_completed) destination = "/chat";
+      const unique = String(Date.now());
+      if (profile.onboarding_completed)
+        // Landing on the NEW-CONVERSATION state, not the latest thread:
+        // `?new=` is what the chat page checks for its empty view, and the
+        // value doubles as the page's React key, so it must be unique per
+        // sign-in to force a fresh mount instead of reusing a stale one.
+        destination = `/chat?new=${unique}`;
     }
   } catch {
     // Profile unresolvable: /onboarding, the same default the old flow used

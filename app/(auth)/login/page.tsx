@@ -49,7 +49,12 @@ export default async function LoginPage({
     // Unconfirmed session (401, backend error or unreachable backend):
     // show the form. Only a backend-confirmed session redirects.
   }
-  if (signedIn) redirect("/chat");
+  if (signedIn)
+    // Re-entering with a valid session lands on the NEW-CONVERSATION state,
+    // matching the post-login redirect in /api/auth/login. The UUID is
+    // unique per redirect, so the chat page's React key (`new-${value}`)
+    // forces a fresh ChatInterface mount.
+    redirect(`/chat?new=${crypto.randomUUID()}`);
 
   const { error } = await searchParams;
   const marker = typeof error === "string" ? error : undefined;
