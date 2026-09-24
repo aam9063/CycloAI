@@ -19,12 +19,40 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import sys
 from pathlib import Path
+from typing import Any
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 REPO_ROOT = BACKEND_DIR.parent
 DEFAULT_KB_DIR = REPO_ROOT / "knowledge-base"
+
+
+def configure_console_streams(*streams: Any) -> None:
+    """Make the CLI's output robust on consoles/pipes with a narrow codec.
+
+    The run reports with status icons (✓ → ✗), em dashes and Spanish text.
+    On a Windows host whose output codec cannot represent them (a legacy
+    codepage such as cp1252, typical when output is piped or captured), the
+    default strict codec raised UnicodeEncodeError AFTER the work was done:
+    the file was embedded and committed, then the run died reporting it.
+
+    Reconfigured once, here at the CLI entry point: printing is the CLI's
+    concern, so the library module stays console-agnostic. UTF-8 lets the
+    stream emit everything the script prints (and matches the documented
+    ``PYTHONUTF8=1`` workaround); ``errors="replace"`` guarantees that even
+    a character the stream still cannot represent degrades to a visible
+    replacement character instead of aborting the run.
+    """
+    for stream in streams or (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        # A stream that refuses reconfiguration must not stop the run; it
+        # just keeps its original codec.
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="replace")
 
 
 async def _main() -> int:
@@ -79,6 +107,7 @@ async def _main() -> int:
 
 
 def main() -> None:
+    configure_console_streams()
     try:
         sys.exit(asyncio.run(_main()))
     except KeyboardInterrupt:
