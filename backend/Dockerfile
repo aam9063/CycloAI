@@ -68,6 +68,21 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
+# Remove the system Python's pip and its vendored packages (this deletes
+# site-packages/pip wholesale, including the msgpack and setuptools copies
+# bundled under pip/_vendor/). This is NOT application cleanup: pip is a
+# build-time tool the runtime never invokes — the app runs /app/.venv/bin/python
+# and the container command is the venv's uvicorn — and those vendored packages
+# are not ours (they live in the BASE IMAGE's system site-packages, not in
+# /app/.venv, and `import msgpack` under the image's own interpreter already
+# fails). Removing them is what takes the scan from 5 high findings to 2. Do
+# not "restore" pip here for debugging convenience: debugging belongs in the
+# builder stage or an ephemeral overlay, and the system interpreter itself
+# stays as the fallback and the source of the standard library. Nothing else
+# in the system Python is touched.
+RUN rm -rf /usr/local/lib/python3.13/site-packages/pip \
+    && rm -rf /usr/local/lib/python3.13/site-packages/pip-*.dist-info
+
 # The platform may assign the port dynamically; respect PORT, default 8000.
 EXPOSE 8000
 

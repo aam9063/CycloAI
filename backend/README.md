@@ -71,18 +71,22 @@ locally pass variables with `--env-file backend/.env` for testing only.
 The image is built on `python:3.13-slim-trixie` (Debian 13), chosen over
 `bookworm` because a scan measured the entire bookworm surface at 3 critical +
 15 high CVEs; trixie measures 0 critical and a handful of high. The image is
-**not** vulnerability-free. A measured `docker scout` run (see the Dockerfile
-comment) shows a small residual of high-severity findings: in the base OS
-layer, `perl` and `zlib1g` have no fixed version published upstream and are
-`Essential: yes` in Debian or linked by Python, so they cannot be removed;
-a couple more sit in Python packages (`msgpack`, `setuptools`) tracked by
-`uv.lock`, which are bumped like any other dependency and are not a
-Dockerfile concern. `apt-get upgrade` does not help and is deliberately
+**not** vulnerability-free. A measured `docker scout` run shows a residual
+of exactly **2 high-severity findings, both in the base OS layer**: `perl`
+(Debian, `Essential: yes`) and `zlib1g` (Debian, linked by Python). Neither
+has a fixed version published upstream and neither can be removed. Everything
+else that used to appear in the scan was a build-time artifact, not a runtime
+dependency: `pip` and the `msgpack`/`setuptools` copies vendored inside it
+live in the base image's *system* site-packages, are not in the application
+virtualenv, and are never invoked at runtime (the app runs
+`/app/.venv/bin/python`), so the runtime stage deletes them explicitly (see
+the Dockerfile). `apt-get upgrade` does not help and is deliberately
 absent (see the Dockerfile). The practical response is to rebuild the image
 periodically so it picks up patched base-image tags, and to scan in CI so the
 residual stays tracked instead of being rediscovered in an editor. None of
 these packages is reachable through the application's HTTP surface — that is
-a risk judgement, not a guarantee.
+a risk judgement, not a guarantee, and the two remaining findings are base
+packages the scan cannot avoid, not a claim that the surface is clean.
 
 ### Build, migrate, index
 
