@@ -24,9 +24,9 @@ export default function WaitlistForm({ source }: WaitlistFormProps) {
           className="flex flex-col items-center gap-2 py-2"
         >
           <p className="text-[15px] font-medium text-on-dark text-center">
-            {state.already
-              ? "Ya estabas en la lista — tu plaza sigue reservada."
-              : "¡Estás dentro! Te avisaremos en cuanto abramos el acceso."}
+            {/* The backend does not distinguish a fresh signup from a duplicate
+                (both return the same 202), so there is a single confirmation. */}
+            ¡Estás dentro! Te avisaremos en cuanto abramos el acceso.
           </p>
         </div>
       ) : (

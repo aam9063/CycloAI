@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import type { Profile } from "@/lib/supabase/types";
+import { ApiError, serverGet } from "@/lib/api/server";
+import type { Profile } from "@/lib/api/types";
 import OnboardingChat from "@/components/onboarding/OnboardingChat";
 
 export const metadata: Metadata = {
@@ -10,29 +10,28 @@ export const metadata: Metadata = {
 };
 
 export default async function OnboardingPage() {
-  const supabase = await createClient();
+  let profile: Profile | null = null;
+  let needsLogin = false;
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    profile = await serverGet<Profile>("/profile");
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      needsLogin = true;
+    } else {
+      throw err;
+    }
+  }
 
-  // Middleware also guards this route, but defensive check is fine.
-  if (!user) {
+  if (needsLogin || profile === null) {
+    // redirect() must be called OUTSIDE try/catch — throws NEXT_REDIRECT internally.
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(
-      "id,display_name,avatar_url,onboarding_completed,objective,weekly_hours,gym_days_per_week,injuries,has_power_meter,ftp_estimated,target_event,target_event_date"
-    )
-    .eq("id", user.id)
-    .single();
-
   // Page-level completion guard — redirect before any client hydration.
-  if (profile?.onboarding_completed) {
+  if (profile.onboarding_completed) {
     redirect("/chat");
   }
 
-  return <OnboardingChat initialProfile={profile as Profile} />;
+  return <OnboardingChat initialProfile={profile} />;
 }

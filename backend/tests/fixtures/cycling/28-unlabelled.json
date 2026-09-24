@@ -1,0 +1,548 @@
+{
+  "free_text": null,
+  "label": null,
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 0,
+      "count": 1
+    },
+    {
+      "after_step_index": 3,
+      "count": 1
+    },
+    {
+      "after_step_index": 6,
+      "count": 1
+    },
+    {
+      "after_step_index": 9,
+      "count": 1
+    },
+    {
+      "after_step_index": 12,
+      "count": 1
+    },
+    {
+      "after_step_index": 15,
+      "count": 1
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 20,
+        "raw": "20 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "warmup",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "warmup",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [
+        "a tope"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "a tope",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "20 sec",
+        "seconds": 20
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "recovery",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5C"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "40 sec",
+        "seconds": 40
+      },
+      "intents": [
+        "aceleración"
+      ],
+      "role": "active",
+      "target": {
+        "intent": "aceleración",
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 8,
+        "raw": "8 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z4"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z4"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z4"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 3,
+        "raw": "3 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z5A"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "clock": "34:30",
+        "kind": "clock",
+        "raw": "34:30"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    }
+  ]
+}

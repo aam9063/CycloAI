@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { ApiError } from '@/lib/api/server';
 import { listConversations } from '@/lib/db/conversations';
+import type { Conversation } from '@/lib/api/types';
 import FloatingSidebar from '@/components/chat/FloatingSidebar';
 
 /**
@@ -21,17 +22,24 @@ export default async function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Auth guard — redirect unauthenticated users to login
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
+  // A backend 401 (expired/absent API session) is a signed-out visitor too —
+  // same login redirect as every other screen behind auth. The middleware gates
+  // on cookie presence; the backend validates the session here.
+  let conversations: Conversation[];
+  try {
+    conversations = await listConversations();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      redirect('/login');
+    }
+    throw err;
   }
 
-  const conversations = await listConversations(supabase, user.id);
+  // FloatingSidebar still speaks the old ConversationRow shape (components are a
+  // later slice). The backend Conversation carries no user_id — ownership is
+  // server-side now — and the list UI never reads it, so the adapter fills it
+  // with an empty string. Delete this adapter when the sidebar migrates.
+  const sidebarConversations = conversations.map((c) => ({ ...c, user_id: '' }));
 
   return (
     <div
@@ -39,7 +47,7 @@ export default async function ChatLayout({
       style={{ height: 'calc(100dvh - 64px)' }}
     >
       {/* Floating sidebar — absolutely positioned over the chat canvas */}
-      <FloatingSidebar conversations={conversations} />
+      <FloatingSidebar conversations={sidebarConversations} />
 
       {/* Chat content — fills full area; ChatInterface manages internal scroll */}
       <div className="h-full overflow-hidden" id="chat-main">

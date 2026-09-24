@@ -1,12 +1,17 @@
 import 'server-only';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { truncateTitle } from '@/lib/chat/text';
-import type { ChatProfile, ConversationRow } from '@/lib/ai/types';
+import { ApiError, serverGet, serverPost } from '@/lib/api/server';
+import type { ChatProfile } from '@/lib/ai/types';
+import type { Conversation } from '@/lib/api/types';
 
 /**
  * Loads the authenticated user's profile row (all fields needed for system prompt).
  * Returns null if no profile row exists yet.
+ *
+ * NOTE: still backed by Supabase on purpose — the profile fetch feeds the chat
+ * route's system-prompt assembly, which is a later migration slice. Everything
+ * else in this module now goes through the backend API.
  */
 export async function getUserProfile(
   supabase: SupabaseClient,
@@ -25,86 +30,41 @@ export async function getUserProfile(
 }
 
 /**
- * Returns the conversation id to use for this turn.
- * - If conversationId is provided, verifies ownership → throws Error('forbidden') on mismatch.
- * - If conversationId is absent, creates a new conversation row and returns its id.
- * Title is set to the first user message content truncated to 60 chars.
+ * Lists the signed-in athlete's own conversations, most recently active first.
+ * Ownership is decided by the backend from the session — the caller never
+ * passes a user id. Errors (including 401) propagate to the caller.
  */
-export async function getOrCreateConversation(
-  supabase: SupabaseClient,
-  userId: string,
-  conversationId: string | undefined | null,
-  firstText: string,
-): Promise<string> {
-  if (conversationId) {
-    const { data, error } = await supabase
-      .from('conversations')
-      .select('id, user_id')
-      .eq('id', conversationId)
-      .single();
+export function listConversations(): Promise<Conversation[]> {
+  return serverGet<Conversation[]>('/conversations');
+}
 
-    if (error || !data) throw new Error('not_found');
-    if (data.user_id !== userId) throw new Error('forbidden');
-    return data.id as string;
+/**
+ * Creates a conversation owned by the signed-in athlete. The backend
+ * normalises the title (word-boundary truncation to 60 chars), so callers
+ * pass the raw first user message.
+ */
+export function createConversation(title?: string | null): Promise<Conversation> {
+  return serverPost<Conversation>('/conversations', { title: title ?? null });
+}
+
+/**
+ * Returns the signed-in athlete's conversation, or null when the backend
+ * answers 404. Missing and foreign ids are deliberately indistinguishable at
+ * the backend (one generic 404) and stay indistinguishable here — callers
+ * render a "not found" state and never learn which case happened. A 422
+ * (malformed id in the URL) maps to null too, so a typo'd link renders the
+ * same "not found" state instead of a 500. All other errors (401, 5xx,
+ * network) propagate.
+ */
+export async function getConversation(
+  conversationId: string,
+): Promise<Conversation | null> {
+  try {
+    return await serverGet<Conversation>(`/conversations/${conversationId}`);
+  } catch (err) {
+    if (err instanceof ApiError && (err.status === 404 || err.status === 422)) {
+      return null;
+    }
+    throw err;
   }
-
-  const title = truncateTitle(firstText, 60);
-  const { data, error } = await supabase
-    .from('conversations')
-    .insert({ user_id: userId, title })
-    .select('id')
-    .single();
-
-  if (error || !data) throw new Error('insert_failed');
-  return data.id as string;
-}
-
-/**
- * Returns a conversation row if it belongs to the given user, otherwise null.
- * Used by RSC pages to enforce ownership before rendering.
- */
-export async function getConversationOwned(
-  supabase: SupabaseClient,
-  id: string,
-  userId: string,
-): Promise<ConversationRow | null> {
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', userId)
-    .single();
-
-  if (error || !data) return null;
-  return data as ConversationRow;
-}
-
-/**
- * Lists all conversations for the user, most-recently updated first.
- */
-export async function listConversations(
-  supabase: SupabaseClient,
-  userId: string,
-): Promise<ConversationRow[]> {
-  const { data, error } = await supabase
-    .from('conversations')
-    .select('*')
-    .eq('user_id', userId)
-    .order('updated_at', { ascending: false });
-
-  if (error || !data) return [];
-  return data as ConversationRow[];
-}
-
-/**
- * Bumps updated_at on a conversation (called in onFinish / onAbort after assistant turn).
- */
-export async function touchConversation(
-  supabase: SupabaseClient,
-  id: string,
-): Promise<void> {
-  await supabase
-    .from('conversations')
-    .update({ updated_at: new Date().toISOString() })
-    .eq('id', id);
 }

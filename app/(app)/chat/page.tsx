@@ -1,10 +1,10 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import type { UIMessage } from 'ai';
-import { createClient } from '@/lib/supabase/server';
+import { ApiError } from '@/lib/api/server';
 import { listConversations } from '@/lib/db/conversations';
 import { getConversationHistory } from '@/lib/db/messages';
-import type { MessageRow } from '@/lib/ai/types';
+import type { Message } from '@/lib/api/types';
 import ChatInterface from '@/components/chat/ChatInterface';
 
 export const metadata: Metadata = {
@@ -16,7 +16,10 @@ interface ChatPageProps {
   searchParams: Promise<{ new?: string }>;
 }
 
-function mapToUIMessages(rows: MessageRow[]): UIMessage[] {
+// The backend returns every message; the UI seeds with the last 20, as before.
+const HISTORY_WINDOW = 20;
+
+function mapToUIMessages(rows: Message[]): UIMessage[] {
   return rows.map((row) => ({
     id: row.id,
     role: row.role as 'user' | 'assistant',
@@ -32,15 +35,6 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
   const { new: isNew } = await searchParams;
   const forceNew = Boolean(isNew);
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
   // When ?new=1 is present, always render the empty/welcome state regardless of
   // existing conversations. This makes "Nueva conversación" actually work (BUG-2).
   if (forceNew) {
@@ -49,12 +43,22 @@ export default async function ChatPage({ searchParams }: ChatPageProps) {
 
   // Render-in-place: load the most-recent conversation if one exists, else welcome state.
   // No redirect to /chat/[id] — avoids double-navigation flash (ADR-5).
-  const conversations = await listConversations(supabase, user.id);
+  // A backend 401 (expired/absent API session) is a signed-out visitor — login redirect.
+  // The middleware gates on cookie presence; the backend validates the session here.
+  let conversations;
+  try {
+    conversations = await listConversations();
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      redirect('/login');
+    }
+    throw err;
+  }
   const latest = conversations[0];
 
   if (latest) {
-    const historyRows = await getConversationHistory(supabase, latest.id, 20);
-    const initialMessages = mapToUIMessages(historyRows);
+    const historyRows = await getConversationHistory(latest.id);
+    const initialMessages = mapToUIMessages(historyRows.slice(-HISTORY_WINDOW));
 
     return (
       <ChatInterface
