@@ -61,7 +61,9 @@ export default async function LoginPage({
     <>
       <h1 className="display-md text-ink mb-6 text-center">Inicia sesión</h1>
 
-      {/* Google OAuth */}
+      {/* Google OAuth — deliberately unavailable (decision D10): the
+          backend implements email + password only. The option stays visible
+          and disabled so users read a decision, not a malfunction. */}
       <GoogleAuthButton label="Continuar con Google" />
 
       {/* Divider */}

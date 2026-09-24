@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Button from "@/components/ui/Button";
-import { createClient } from "@/lib/supabase/client";
 
 // Official Google "G" mark — 4 brand colors are a logo-color exception per DESIGN.md
 // ("accent colors belong inside chart points and integration logos only").
@@ -38,35 +36,32 @@ interface GoogleAuthButtonProps {
   label: string;
 }
 
+/**
+ * Google sign-in is intentionally UNAVAILABLE, not broken.
+ *
+ * The backend implements email + password only. OAuth (Supabase Auth) was
+ * dropped for now (decision D10) rather than half-built. This component stays
+ * as the seam where Google sign-in returns — re-adding OAuth later will
+ * restore a handler here and an /auth/callback route — but nothing in this
+ * rendered path may attempt an authentication that cannot succeed.
+ */
 export default function GoogleAuthButton({ label }: GoogleAuthButtonProps) {
-  const [loading, setLoading] = useState(false);
-
-  async function handleClick() {
-    setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    // On error, re-enable the button. On success the browser navigates away.
-    if (error) {
-      setLoading(false);
-    }
-  }
-
   return (
-    <Button
-      variant="outline"
-      type="button"
-      onClick={handleClick}
-      disabled={loading}
-      className="w-full gap-2"
-      aria-label={label}
-    >
-      <GoogleIcon />
-      {loading ? "Conectando…" : label}
-    </Button>
+    <div>
+      <Button
+        variant="outline"
+        type="button"
+        disabled
+        aria-disabled="true"
+        className="w-full gap-2 cursor-not-allowed opacity-50"
+        aria-label={`${label} (no disponible)`}
+      >
+        <GoogleIcon />
+        {label}
+      </Button>
+      <p className="mt-2 text-center text-[13px] text-ink-mute">
+        Inicio de sesión con Google no disponible por ahora.
+      </p>
+    </div>
   );
 }
