@@ -1,0 +1,129 @@
+{
+  "free_text": null,
+  "label": "E3",
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 0,
+      "count": 1
+    },
+    {
+      "after_step_index": 3,
+      "count": 1
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 30,
+        "raw": "30 min"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 20,
+        "raw": "20 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 10,
+        "raw": "10 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z3"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 15,
+        "raw": "15 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 10,
+        "raw": "10 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z4"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 4,
+        "raw": "4 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z2"
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 40,
+        "raw": "40 min"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "intent": null,
+        "kind": "zone",
+        "system": "heart_rate",
+        "zone": "Z1"
+      }
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 // Pure logic module — no React, shared by client and server.
 // All question copy is verbatim from CLAUDE.md ONBOARDING_FLOW.
 
-import type { Profile } from "@/lib/supabase/types";
+import type { Profile } from "@/lib/api/types";
 
 export type OnboardingStepId =
   | "objective"
@@ -10,6 +10,8 @@ export type OnboardingStepId =
   | "injuries"
   | "power_meter"
   | "ftp"
+  | "training_system"
+  | "lthr"
   | "target_event";
 
 export interface OptionDef {
@@ -20,7 +22,7 @@ export interface OptionDef {
 export interface StepDef {
   id: OnboardingStepId;
   question: string;
-  kind: "options" | "free_text" | "ftp";
+  kind: "options" | "free_text" | "ftp" | "lthr";
   options?: OptionDef[];
   placeholder?: string;
   /** The Profile column that indicates this step is answered (non-null). */
@@ -60,7 +62,8 @@ const GYM_DAYS_REVERSE: Record<number, string> = {
   3: "3 días",
 };
 
-// The 6 main steps (Q5b 'ftp' is not a separate dot — inserted conditionally in session).
+// The 7 main steps (Q5b 'ftp' and the LTHR step are not separate dots —
+// both inserted conditionally in session).
 export const STEPS: StepDef[] = [
   {
     id: "objective",
@@ -136,6 +139,23 @@ export const STEPS: StepDef[] = [
     mapsTo: "has_power_meter",
   },
   {
+    id: "training_system",
+    question:
+      "¿Prefieres guiarte por la potencia o por la frecuencia cardíaca para entrenar?",
+    kind: "options",
+    options: [
+      {
+        value: "power",
+        label: "Por potencia (zonas a partir de mi FTP)",
+      },
+      {
+        value: "heart_rate",
+        label: "Por frecuencia cardíaca (zonas a partir de mi LTHR)",
+      },
+    ],
+    mapsTo: "training_system",
+  },
+  {
     id: "target_event",
     question:
       "¿Tienes algún evento o carrera objetivo en los próximos meses? (Si no tienes, no pasa nada)",
@@ -145,7 +165,9 @@ export const STEPS: StepDef[] = [
   },
 ];
 
-// Q5b step definition (inserted conditionally — not a separate progress dot).
+/**
+ * Q5b step definition (inserted conditionally — not a separate progress dot).
+ */
 export const FTP_STEP: StepDef = {
   id: "ftp",
   question: "¿Cuál es tu FTP actual? (en vatios)",
@@ -154,11 +176,25 @@ export const FTP_STEP: StepDef = {
 };
 
 /**
+ * LTHR step definition (inserted conditionally — not a separate progress dot).
+ * Mirrors FTP_STEP: asked only when the athlete's declared training system
+ * needs it (heart_rate), exactly as Q5b is asked only when a power-meter
+ * athlete still owes an FTP.
+ */
+export const LTHR_STEP: StepDef = {
+  id: "lthr",
+  question: "¿Cuál es tu LTHR? (frecuencia cardíaca de umbral, en ppm)",
+  kind: "lthr",
+  mapsTo: "lthr_bpm",
+};
+
+/**
  * Returns the index into STEPS of the first unanswered step, or -1 if all answered.
  * Derivation order: objective → weekly_hours → gym_days_per_week → injuries →
- * has_power_meter → target_event.
- * Note: ftp (Q5b) is NOT a gating column here — it's handled in-session via the
- * power_meter branch (ADR-2). has_power_meter null means power_meter is unanswered.
+ * has_power_meter → training_system → target_event.
+ * Note: ftp (Q5b) and lthr are NOT gating columns here — both are handled
+ * in-session via the power_meter / training_system branches (ADR-2 pattern).
+ * has_power_meter null means power_meter is unanswered.
  */
 export function firstUnansweredStep(profile: Profile): number {
   for (let i = 0; i < STEPS.length; i++) {
@@ -211,6 +247,14 @@ export function labelForAnswer(
     }
     case "ftp": {
       return `${profileValue} W`;
+    }
+    case "training_system": {
+      const step = STEPS.find((s) => s.id === "training_system");
+      const option = step?.options?.find((o) => o.value === profileValue);
+      return option?.label ?? String(profileValue);
+    }
+    case "lthr": {
+      return `${profileValue} ppm`;
     }
     case "target_event": {
       if (

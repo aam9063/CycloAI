@@ -1,0 +1,369 @@
+{
+  "activation": [],
+  "core": [],
+  "exercises": [
+    {
+      "name": "Press banca",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 13,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 13,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 13,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 13,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Pres banca inclinado",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Jalón al pecho",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 12,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Remo con barra",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 9,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 9,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 9,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 9,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Remo polea baja",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Curl de biceps",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Martillo biceps",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 8,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Extensión triceps con cuerda",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": 12,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": 12,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 10,
+          "reps_max": 12,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "Press francés",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 7,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 7,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 7,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 7,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    },
+    {
+      "name": "crunch abdomen",
+      "note": null,
+      "rest_s": null,
+      "sets": [
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        },
+        {
+          "load": null,
+          "reps": 25,
+          "reps_max": null,
+          "rir": null,
+          "tempo": null,
+          "unit": "reps"
+        }
+      ]
+    }
+  ],
+  "name": "TREN SUPERIOR",
+  "prose_items": [
+    "Puedes hacer movilidad articular de hombros.",
+    "3 planchas de 30´´"
+  ]
+}

@@ -1,0 +1,287 @@
+{
+  "free_text": null,
+  "label": null,
+  "name": null,
+  "repeat_markers": [
+    {
+      "after_step_index": 0,
+      "count": 5
+    },
+    {
+      "after_step_index": 3,
+      "count": 5
+    },
+    {
+      "after_step_index": 6,
+      "count": 6
+    },
+    {
+      "after_step_index": 9,
+      "count": 6
+    },
+    {
+      "after_step_index": 12,
+      "count": 6
+    }
+  ],
+  "steps": [
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 20,
+        "raw": "20 min"
+      },
+      "intents": [],
+      "role": "warmup",
+      "target": {
+        "kind": "rpe",
+        "rpe": 1.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 60,
+        "min_rpm": 60
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 1,
+        "raw": "1 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 7.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 1,
+        "raw": "1 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 7.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 7,
+        "raw": "7 min"
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 2.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 60,
+        "min_rpm": 60
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 1,
+        "raw": "1 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 7.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": {
+        "max_rpm": 90,
+        "min_rpm": 90
+      },
+      "duration": {
+        "kind": "minutes",
+        "minutes": 1,
+        "raw": "1 min"
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 7.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 12,
+        "raw": "12 min"
+      },
+      "intents": [
+        "A TOPE"
+      ],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 2.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "15 sec",
+        "seconds": 15
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 10.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "45 sec",
+        "seconds": 45
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 6.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [
+        "A TOPE"
+      ],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 2.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "15 sec",
+        "seconds": 15
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 10.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "45 sec",
+        "seconds": 45
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 6.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "minutes",
+        "minutes": 5,
+        "raw": "5 min"
+      },
+      "intents": [
+        "A TOPE"
+      ],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 2.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "15 sec",
+        "seconds": 15
+      },
+      "intents": [],
+      "role": "recovery",
+      "target": {
+        "kind": "rpe",
+        "rpe": 10.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "kind": "seconds",
+        "raw": "45 sec",
+        "seconds": 45
+      },
+      "intents": [],
+      "role": "active",
+      "target": {
+        "kind": "rpe",
+        "rpe": 6.0,
+        "zone": null
+      }
+    },
+    {
+      "cadence": null,
+      "duration": {
+        "clock": "30:05",
+        "kind": "clock",
+        "raw": "30:05"
+      },
+      "intents": [],
+      "role": "cooldown",
+      "target": {
+        "kind": "rpe",
+        "rpe": 1.0,
+        "zone": null
+      }
+    }
+  ]
+}

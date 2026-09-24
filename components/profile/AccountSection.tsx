@@ -1,16 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import Button from "@/components/ui/Button";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
-import { createClient } from "@/lib/supabase/client";
 import { signOutAction } from "@/app/(app)/actions";
+import { deleteAccountAction } from "@/app/(app)/profile/actions";
 
 export default function AccountSection() {
-  const supabase = useMemo(() => createClient(), []);
-  const router = useRouter();
-
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -22,22 +18,19 @@ export default function AccountSection() {
     setPending(true);
     setErrorMsg(null);
 
-    const { error } = await supabase.functions.invoke("delete-account", {
-      method: "POST",
-    });
+    // The session cookie is first-party to this app's host, so a browser
+    // fetch to the backend would carry no session — the deletion goes
+    // through the server action, which forwards the cookie.
+    const result = await deleteAccountAction();
 
-    if (error) {
+    if (result.error) {
       setPending(false);
-      setErrorMsg(
-        "No se pudo eliminar la cuenta. Por favor, intenta de nuevo."
-      );
+      setErrorMsg(result.error);
       return;
     }
 
-    // On success: sign out then navigate to home
+    // On success the action redirects away.
     // Do NOT setPending(false) — the page is navigating away
-    await supabase.auth.signOut();
-    router.replace("/");
   }
 
   return (

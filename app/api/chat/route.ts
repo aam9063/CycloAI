@@ -2,32 +2,30 @@ import 'server-only';
 
 import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
-import { createClient } from '@/lib/supabase/server';
-import { buildSystemPrompt } from '@/lib/ai/system-prompt';
-import { searchKnowledgeBase } from '@/lib/ai/rag';
-import { getUserProfile, getOrCreateConversation, touchConversation } from '@/lib/db/conversations';
-import { insertUserMessage, insertAssistantMessage } from '@/lib/db/messages';
+import { appendUserMessage, appendAssistantMessage } from '@/lib/db/messages';
+import { ApiError, serverPost } from '@/lib/api/server';
+import type { ChatContextResponse } from '@/lib/api/types';
 import { getClientIp, checkRateLimit } from '@/lib/utils/ratelimit';
 import { uiMessageText } from '@/lib/chat/text';
 
-export const runtime = 'nodejs'; // Supabase SSR cookie client requires Node runtime
+export const runtime = 'nodejs'; // Node runtime for streaming + backend fetch
 export const maxDuration = 60;  // Vercel Hobby hard cap (60 s); guards long Gemini streams
 
 export async function POST(req: Request) {
-  // 1. Auth — verify Supabase session cookie
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response('No autorizado', { status: 401 });
-  }
-
-  // 2. Per-user chat rate limit — checked before any expensive work.
-  // Uses user.id (authenticated) so each account has its own budget regardless of IP.
+  // 1. Per-client chat rate limit — checked before any expensive work.
+  //
+  // Identity note (deliberate, documented simplification): the previous
+  // `chat:${user.id}:${ip}` key came from the removed Supabase `getUser()`.
+  // The only identity authority now is the backend, whose caller id appears
+  // in the /profile response — but reading it here would add a backend
+  // roundtrip before the limit, so every request (including rejected ones)
+  // would hit the backend and the limiter would no longer shield it. The
+  // key is therefore IP-based: `chat:${ip}`. This limit is a pre-stream
+  // throttle only, NOT an auth control — every subsequent step goes through
+  // the backend, and `POST /chat/context` (step 4) answers 401 for an
+  // absent session, so no turn is ever processed unauthenticated.
   const ip = await getClientIp();
-  const chatRl = await checkRateLimit({ key: `chat:${user.id}:${ip}`, limit: 15, windowSeconds: 60 });
+  const chatRl = await checkRateLimit({ key: `chat:${ip}`, limit: 15, windowSeconds: 60 });
   if (!chatRl.success) {
     return new Response('429: Demasiados mensajes. Espera un momento.', { status: 429 });
   }
@@ -48,13 +46,13 @@ export async function POST(req: Request) {
     return new Response('Solicitud demasiado grande.', { status: 400 });
   }
 
-  // 4. Load user profile (needed for system prompt)
-  const profile = await getUserProfile(supabase, user.id);
-  if (!profile) {
-    return new Response('Perfil no encontrado', { status: 500 });
-  }
+  // 4. Assemble the turn's context via the backend (POST /chat/context).
+  // The backend builds the system prompt from the athlete's REAL profile plus
+  // knowledge-base retrieval, and resolves or creates the conversation (owner-
+  // checked; a missing id and a foreign id are the same generic 404). The
+  // response shape is `ChatContextResponse` (lib/api/types.ts), mirroring
+  // backend ChatContextOut (routes_chat.py).
 
-  // 5. Resolve conversation (create or verify ownership)
   const lastUserMessage = messages[messages.length - 1];
   const lastText = uiMessageText(lastUserMessage);
 
@@ -64,28 +62,43 @@ export async function POST(req: Request) {
   }
 
   let convId: string;
+  let systemPrompt: string;
   try {
-    convId = await getOrCreateConversation(supabase, user.id, conversationId, lastText);
+    const context = await serverPost<ChatContextResponse>('/chat/context', {
+      message: lastText,
+      conversation_id: conversationId ?? null,
+    });
+    convId = context.conversation_id;
+    systemPrompt = context.system_prompt;
   } catch (err) {
-    const msg = err instanceof Error ? err.message : '';
-    if (msg === 'forbidden') return new Response('Acceso denegado', { status: 403 });
-    if (msg === 'not_found') return new Response('Conversación no encontrada', { status: 404 });
+    if (err instanceof ApiError) {
+      // 401: unauthenticated backend session — same response as the route's
+      // other auth failures. 404: missing or foreign conversation, the same
+      // generic 404 the route already produced for a missing conversation.
+      if (err.status === 401) {
+        return new Response('No autorizado', { status: 401 });
+      }
+      if (err.status === 404) {
+        return new Response('Conversación no encontrada', { status: 404 });
+      }
+    }
+    throw err;
+  }
+
+  // 6. Persist user message BEFORE streaming (durability if stream fails).
+  // Unlike the old Supabase insert (errors swallowed), a failed save now fails
+  // the request loudly — the client sees an error instead of silently losing
+  // the turn from history.
+  try {
+    await appendUserMessage(convId, lastText);
+  } catch (err) {
+    console.error('[chat] failed to persist user message:', err);
     return new Response('Error interno', { status: 500 });
   }
 
-  // 6. Persist user message BEFORE streaming (durability if stream fails)
-  await insertUserMessage(supabase, {
-    conversationId: convId,
-    userId: user.id,
-    content: lastText,
-  });
-
-  // 7. Retrieve RAG context then build system prompt.
-  // searchKnowledgeBase returns '' on any failure — RAG is additive, never blocking.
-  // Adds ~100-250ms (embed + RPC) before first token; sequential by design (system prompt
-  // must be fully formed before streaming begins).
-  const ragContext = await searchKnowledgeBase(lastText);
-  const systemPrompt = buildSystemPrompt(profile, ragContext);
+  // 7. The system prompt came from the backend context call above (step 4):
+  // built from the athlete's real profile plus knowledge retrieval, with
+  // `knowledge_used` reporting whether retrieval contributed anything.
 
   // 8. Stream via Gemini 3.5 Flash
   const modelMessages = await convertToModelMessages(messages);
@@ -155,15 +168,16 @@ export async function POST(req: Request) {
         // W-1 fix: if onAbort already persisted a row, skip this insert.
         if (persistedByAbort) return;
         const isAborted = finishReason !== 'stop' && finishReason !== 'length';
-        await insertAssistantMessage(supabase, {
-          conversationId: convId,
-          userId: user.id,
-          content: text,
-          // Always persist finishReason: 'length' cuts and provider anomalies
-          // are diagnosable from the DB without reproducing.
-          metadata: isAborted ? { aborted: true, finishReason } : { finishReason },
-        });
-        await touchConversation(supabase, convId);
+        // Append bumps updated_at server-side, so the old touchConversation call
+        // is gone. A failed save is logged, not swallowed silently, and cannot
+        // crash the stream response this late.
+        try {
+          await appendAssistantMessage(convId, text, isAborted
+            ? { aborted: true, finishReason }
+            : { finishReason });
+        } catch (err) {
+          console.error('[chat] failed to persist assistant message:', err);
+        }
       },
       onAbort: async ({ steps }) => {
         // Fires when abortSignal fires (user stop / client disconnect) mid-stream.
@@ -172,13 +186,13 @@ export async function POST(req: Request) {
           .map((s) => s.text ?? '')
           .join('');
         persistedByAbort = true; // W-1: signal onFinish to skip its insert
-        await insertAssistantMessage(supabase, {
-          conversationId: convId,
-          userId: user.id,
-          content: partial,
-          metadata: { aborted: true }, // SG-1: spec says { aborted: true }
-        });
-        await touchConversation(supabase, convId);
+        // Append bumps updated_at server-side, so the old touchConversation call
+        // is gone. A failed save is logged, not swallowed silently.
+        try {
+          await appendAssistantMessage(convId, partial, { aborted: true }); // SG-1: spec says { aborted: true }
+        } catch (err) {
+          console.error('[chat] failed to persist aborted assistant message:', err);
+        }
       },
     });
   } catch (err) {

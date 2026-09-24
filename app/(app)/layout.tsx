@@ -1,29 +1,36 @@
 import Link from "next/link";
 import Image from "next/image";
+import { redirect } from "next/navigation";
 import NavLinks from "@/components/app/NavLinks";
 import UserMenu from "@/components/app/UserMenu";
-import { createClient } from "@/lib/supabase/server";
+import { ApiError, serverGet } from "@/lib/api/server";
+import type { Profile } from "@/lib/api/types";
 
 export default async function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Fetch session + profile display_name server-side.
-  // Both can be null (unauthenticated edge or profile not yet created) — handle defensively.
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
+  // The backend validates the session on every request, so the profile read IS
+  // the session authority here — no separate auth check. A 401 (expired/absent
+  // API session) is a signed-out visitor: login redirect, same as every other
+  // screen behind auth. The app shell must not render for a visitor.
   let displayName: string | null = null;
-  if (user) {
-    const { data } = await supabase
-      .from("profiles")
-      .select("display_name")
-      .eq("id", user.id)
-      .single();
-    displayName = data?.display_name ?? null;
+  try {
+    const profile = await serverGet<Profile>("/profile");
+    displayName = profile.display_name;
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) {
+      redirect("/login");
+    }
+    // 404: a valid session whose profile row does not exist (the backend
+    // creates rows via trigger, so this is an integrity anomaly, not a normal
+    // state). The old auth path degraded gracefully here — render the shell
+    // with no name. The two statuses are distinct on the endpoint on purpose:
+    // only a 401 means signed-out. Everything else is a real failure.
+    if (!(err instanceof ApiError && err.status === 404)) {
+      throw err;
+    }
   }
 
   return (
