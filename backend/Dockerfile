@@ -5,11 +5,20 @@
 # tooling. The build toolchain (uv), caches, and dev dependencies never reach
 # the final image.
 #
+# Base: Debian 13 (trixie), not bookworm. Measured with docker scout
+# (2025): bookworm's base layer carries 3 critical + 15 high CVEs, all in
+# Debian packages (perl-base, util-linux, libssl3, zlib1g); trixie carries
+# 0 critical + 5 high and 62 fewer packages. Most bookworm findings have NO
+# fixed version upstream, so `apt-get upgrade` here would change nothing and
+# make builds non-reproducible. It is deliberately absent: the fix is this
+# base-image tag plus periodic rebuilds, not an upgrade layer. Do NOT
+# "fix" the scanner warning with an apt-get upgrade.
+#
 # Python 3.13 matches the project pin (requires-python = ">=3.13,<3.14" and
 # uv.lock's "==3.13.*"). Do NOT bump the minor: the dependency set is not
 # verified beyond it.
 
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-trixie AS builder
 
 # uv is a build tool: it lives in the builder only. Pinned for reproducible
 # builds; the dependency versions themselves come from uv.lock, not from uv.
@@ -40,7 +49,7 @@ COPY alembic ./alembic
 COPY scripts ./scripts
 
 
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-trixie
 
 # Dedicated unprivileged user: a container that serves HTTP has no business
 # being root. Numeric UID so it is stable regardless of host UID allocation.

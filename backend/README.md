@@ -66,6 +66,24 @@ the model API, so a plain test run must never spend quota.
 `backend/.env` is never copied into the image (excluded by `.dockerignore`);
 locally pass variables with `--env-file backend/.env` for testing only.
 
+### Base-image security posture
+
+The image is built on `python:3.13-slim-trixie` (Debian 13), chosen over
+`bookworm` because a scan measured the entire bookworm surface at 3 critical +
+15 high CVEs; trixie measures 0 critical and a handful of high. The image is
+**not** vulnerability-free. A measured `docker scout` run (see the Dockerfile
+comment) shows a small residual of high-severity findings: in the base OS
+layer, `perl` and `zlib1g` have no fixed version published upstream and are
+`Essential: yes` in Debian or linked by Python, so they cannot be removed;
+a couple more sit in Python packages (`msgpack`, `setuptools`) tracked by
+`uv.lock`, which are bumped like any other dependency and are not a
+Dockerfile concern. `apt-get upgrade` does not help and is deliberately
+absent (see the Dockerfile). The practical response is to rebuild the image
+periodically so it picks up patched base-image tags, and to scan in CI so the
+residual stays tracked instead of being rediscovered in an editor. None of
+these packages is reachable through the application's HTTP surface — that is
+a risk judgement, not a guarantee.
+
 ### Build, migrate, index
 
 ```bash
