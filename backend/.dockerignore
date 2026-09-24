@@ -1,0 +1,24 @@
+# Keep the build context minimal: a smaller context means faster builds and a
+# lower chance of secrets or local junk reaching the image layers.
+
+# Credentials: never baked into the image. The platform injects environment
+# variables; .env is a local convenience only.
+.env
+.env.*
+
+# Local environments and Python caches: rebuilt inside the image from the
+# lockfile, never copied from the host.
+.venv
+__pycache__/
+*.pyc
+*.py[cod]
+
+# Dev tooling: the test suite and linter caches are not needed to run the
+# service, and excluding them shrinks the image's attack surface.
+.pytest_cache/
+.ruff_cache/
+tests/
+
+# The repository's own metadata; not part of the backend build.
+.git
+.gitignore

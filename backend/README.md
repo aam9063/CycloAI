@@ -52,6 +52,48 @@ CYCLOAI_LIVE_SMOKE=1 uv run pytest tests/test_api_live_smoke.py -s
 The last one is opt-in and deliberately skipped by default: it makes a **real** call to
 the model API, so a plain test run must never spend quota.
 
+## Deployment (container)
+
+### Environment variables the container requires
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | asyncpg driver form: `postgresql+asyncpg://user:password@host:port/dbname`. Never baked into the image; the platform injects it. |
+| `JWT_SECRET` | yes | No insecure default exists — without it the app refuses to issue sessions. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | yes for RAG and generation | Same role as in local setup. |
+| `CYCLOAI_ENV` | production only | Set to `production` to enable the session cookie's `Secure` flag. Without it the cookie is not sent over plain HTTP, so on a deployment that is not served over HTTPS there is **no session at all** — a deployment-shape requirement (serve production behind HTTPS), not a code detail. |
+
+`backend/.env` is never copied into the image (excluded by `.dockerignore`);
+locally pass variables with `--env-file backend/.env` for testing only.
+
+### Build, migrate, index
+
+```bash
+docker build -f backend/Dockerfile -t cycloai-backend backend/   # context is backend/, not the repo root
+```
+
+Migrations are a deploy step and run **inside** the image (the `alembic` CLI
+ships in its virtualenv):
+
+```bash
+docker run --rm --env-file backend/.env cycloai-backend alembic upgrade head
+```
+
+Before the RAG endpoints return anything, index the knowledge base **against
+the production database**. The embeddings are DATA, not code: they live in
+`knowledge_embeddings` rows, so they do not travel with the image. A fresh
+deployment retrieves nothing until the corpus is indexed. `knowledge-base/`
+lives outside the build context, so mount it read-only:
+
+```bash
+docker run --rm --env-file backend/.env \
+  -v "$(pwd)/knowledge-base:/app/knowledge-base:ro" \
+  cycloai-backend python scripts/rag_index.py
+```
+
+Finally, point the frontend at this service: `NEXT_PUBLIC_API_URL` must be the
+backend's public URL.
+
 ## Layout
 
 ```
