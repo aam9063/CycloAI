@@ -1,6 +1,5 @@
 import { notFound, redirect } from 'next/navigation';
 import type { UIMessage } from 'ai';
-import { createClient } from '@/lib/supabase/server';
 import { ApiError } from '@/lib/api/server';
 import { getConversation } from '@/lib/db/conversations';
 import { getConversationHistory } from '@/lib/db/messages';
@@ -26,20 +25,12 @@ function mapToUIMessages(rows: Message[]): UIMessage[] {
 export default async function ConversationPage({ params }: ConversationPageProps) {
   const { conversationId } = await params;
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
   // The backend already enforces ownership: a missing id and a foreign id are
   // the same generic 404 (getConversation collapses both — plus a malformed
   // id's 422 — into null). Render "not found"; no second ownership check here.
   // A backend 401 (expired/absent API session) is a signed-out visitor — login
-  // redirect, same as every other screen behind auth.
+  // redirect, same as every other screen behind auth. The middleware gates on
+  // cookie presence; the backend validates the session here.
   let conversation;
   try {
     conversation = await getConversation(conversationId);

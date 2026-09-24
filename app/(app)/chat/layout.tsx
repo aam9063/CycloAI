@@ -1,5 +1,4 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { ApiError } from '@/lib/api/server';
 import { listConversations } from '@/lib/db/conversations';
 import type { Conversation } from '@/lib/api/types';
@@ -23,18 +22,9 @@ export default async function ChatLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Auth guard — redirect unauthenticated users to login
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
   // A backend 401 (expired/absent API session) is a signed-out visitor too —
-  // same login redirect as every other screen behind auth.
+  // same login redirect as every other screen behind auth. The middleware gates
+  // on cookie presence; the backend validates the session here.
   let conversations: Conversation[];
   try {
     conversations = await listConversations();

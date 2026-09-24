@@ -2,31 +2,30 @@ import 'server-only';
 
 import { google } from '@ai-sdk/google';
 import { streamText, convertToModelMessages, type UIMessage } from 'ai';
-import { createClient } from '@/lib/supabase/server';
 import { appendUserMessage, appendAssistantMessage } from '@/lib/db/messages';
 import { ApiError, serverPost } from '@/lib/api/server';
 import type { ChatContextResponse } from '@/lib/api/types';
 import { getClientIp, checkRateLimit } from '@/lib/utils/ratelimit';
 import { uiMessageText } from '@/lib/chat/text';
 
-export const runtime = 'nodejs'; // Supabase SSR cookie client requires Node runtime
+export const runtime = 'nodejs'; // Node runtime for streaming + backend fetch
 export const maxDuration = 60;  // Vercel Hobby hard cap (60 s); guards long Gemini streams
 
 export async function POST(req: Request) {
-  // 1. Auth — verify Supabase session cookie
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return new Response('No autorizado', { status: 401 });
-  }
-
-  // 2. Per-user chat rate limit — checked before any expensive work.
-  // Uses user.id (authenticated) so each account has its own budget regardless of IP.
+  // 1. Per-client chat rate limit — checked before any expensive work.
+  //
+  // Identity note (deliberate, documented simplification): the previous
+  // `chat:${user.id}:${ip}` key came from the removed Supabase `getUser()`.
+  // The only identity authority now is the backend, whose caller id appears
+  // in the /profile response — but reading it here would add a backend
+  // roundtrip before the limit, so every request (including rejected ones)
+  // would hit the backend and the limiter would no longer shield it. The
+  // key is therefore IP-based: `chat:${ip}`. This limit is a pre-stream
+  // throttle only, NOT an auth control — every subsequent step goes through
+  // the backend, and `POST /chat/context` (step 4) answers 401 for an
+  // absent session, so no turn is ever processed unauthenticated.
   const ip = await getClientIp();
-  const chatRl = await checkRateLimit({ key: `chat:${user.id}:${ip}`, limit: 15, windowSeconds: 60 });
+  const chatRl = await checkRateLimit({ key: `chat:${ip}`, limit: 15, windowSeconds: 60 });
   if (!chatRl.success) {
     return new Response('429: Demasiados mensajes. Espera un momento.', { status: 429 });
   }
