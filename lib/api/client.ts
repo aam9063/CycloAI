@@ -5,12 +5,22 @@
  * to `http://localhost:8000`). The backend must be running for any call to
  * succeed.
  *
- * The session is an httpOnly cookie set by the backend. Because the cookie
- * is not readable from JavaScript and the browser will not send cookies on
- * cross-origin fetches by default, EVERY request below is sent with
- * `credentials: "include"` — this is the single most important line in the
- * module. Nothing here reads or writes tokens: copying the session into
- * JavaScript would defeat httpOnly.
+ * SESSION LIMITATION — read this before using this module for anything
+ * authenticated. Since sign-in was rewired, the session cookie is a
+ * FIRST-PARTY cookie on THIS APP's host (the backend delivers it on a
+ * response from the app's own origin, with no Domain attribute). The
+ * browser therefore sends it to the app's server — where Next.js server
+ * code reaches it via `cookies()` — but it does NOT send it to the
+ * backend's host. Consequence: NO request made through this module
+ * carries a session, whatever `credentials: "include"` says. This module
+ * CANNOT make authenticated calls. Anything needing a session must go
+ * through the server-side wrapper in `./server`, which forwards the
+ * incoming request's cookies. A browser-side authenticated call fails as
+ * a mysterious 401 on a screen where the user is clearly signed in — do
+ * not reach for this module there.
+ *
+ * What this module is still right for: the endpoints that need no
+ * session (currently the waitlist signup).
  *
  * Error handling: failed responses throw `ApiError`, which carries the HTTP
  * status AND the parsed body, because the backend puts meaningful detail in
