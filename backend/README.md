@@ -52,6 +52,70 @@ CYCLOAI_LIVE_SMOKE=1 uv run pytest tests/test_api_live_smoke.py -s
 The last one is opt-in and deliberately skipped by default: it makes a **real** call to
 the model API, so a plain test run must never spend quota.
 
+## Deployment (container)
+
+### Environment variables the container requires
+
+| Variable | Required | Notes |
+| --- | --- | --- |
+| `DATABASE_URL` | yes | asyncpg driver form: `postgresql+asyncpg://user:password@host:port/dbname`. Never baked into the image; the platform injects it. |
+| `JWT_SECRET` | yes | No insecure default exists — without it the app refuses to issue sessions. |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | yes for RAG and generation | Same role as in local setup. |
+| `CYCLOAI_ENV` | production only | Set to `production` to enable the session cookie's `Secure` flag. Without it the cookie is not sent over plain HTTP, so on a deployment that is not served over HTTPS there is **no session at all** — a deployment-shape requirement (serve production behind HTTPS), not a code detail. |
+
+`backend/.env` is never copied into the image (excluded by `.dockerignore`);
+locally pass variables with `--env-file backend/.env` for testing only.
+
+### Base-image security posture
+
+The image is built on `python:3.13-slim-trixie` (Debian 13), chosen over
+`bookworm` because a scan measured the entire bookworm surface at 3 critical +
+15 high CVEs; trixie measures 0 critical and a handful of high. The image is
+**not** vulnerability-free. A measured `docker scout` run shows a residual
+of exactly **2 high-severity findings, both in the base OS layer**: `perl`
+(Debian, `Essential: yes`) and `zlib1g` (Debian, linked by Python). Neither
+has a fixed version published upstream and neither can be removed. Everything
+else that used to appear in the scan was a build-time artifact, not a runtime
+dependency: `pip` and the `msgpack`/`setuptools` copies vendored inside it
+live in the base image's *system* site-packages, are not in the application
+virtualenv, and are never invoked at runtime (the app runs
+`/app/.venv/bin/python`), so the runtime stage deletes them explicitly (see
+the Dockerfile). `apt-get upgrade` does not help and is deliberately
+absent (see the Dockerfile). The practical response is to rebuild the image
+periodically so it picks up patched base-image tags, and to scan in CI so the
+residual stays tracked instead of being rediscovered in an editor. None of
+these packages is reachable through the application's HTTP surface — that is
+a risk judgement, not a guarantee, and the two remaining findings are base
+packages the scan cannot avoid, not a claim that the surface is clean.
+
+### Build, migrate, index
+
+```bash
+docker build -f backend/Dockerfile -t cycloai-backend backend/   # context is backend/, not the repo root
+```
+
+Migrations are a deploy step and run **inside** the image (the `alembic` CLI
+ships in its virtualenv):
+
+```bash
+docker run --rm --env-file backend/.env cycloai-backend alembic upgrade head
+```
+
+Before the RAG endpoints return anything, index the knowledge base **against
+the production database**. The embeddings are DATA, not code: they live in
+`knowledge_embeddings` rows, so they do not travel with the image. A fresh
+deployment retrieves nothing until the corpus is indexed. `knowledge-base/`
+lives outside the build context, so mount it read-only:
+
+```bash
+docker run --rm --env-file backend/.env \
+  -v "$(pwd)/knowledge-base:/app/knowledge-base:ro" \
+  cycloai-backend python scripts/rag_index.py
+```
+
+Finally, point the frontend at this service: `NEXT_PUBLIC_API_URL` must be the
+backend's public URL.
+
 ## Layout
 
 ```

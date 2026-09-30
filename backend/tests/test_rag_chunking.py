@@ -12,6 +12,8 @@ The database-dependent integration tests live in
 
 from __future__ import annotations
 
+import importlib.util
+import io
 import math
 from pathlib import Path
 
@@ -383,3 +385,67 @@ class TestQuotaHandling:
         assert attempts["n"] == MAX_EMBED_ATTEMPTS == 5
         assert len(waits) == MAX_EMBED_ATTEMPTS - 1
         assert all(math.isclose(w, 45.0) for w in waits)
+
+
+# ---------------------------------------------------------------------------
+# CLI console encoding (regression: UnicodeEncodeError on Windows cp1252 runs)
+# ---------------------------------------------------------------------------
+
+
+def _load_rag_index_module():
+    """Load ``backend/scripts/rag_index.py`` by path (scripts/ is not a package)."""
+    script = REPO_ROOT / "backend" / "scripts" / "rag_index.py"
+    spec = importlib.util.spec_from_file_location("rag_index_under_test", script)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class _RecordingStream:
+    """Minimal stand-in for sys.stdout that records reconfigure() calls."""
+
+    def __init__(self):
+        self.reconfigure_kwargs: list[dict] = []
+
+    def reconfigure(self, **kwargs):
+        self.reconfigure_kwargs.append(kwargs)
+
+
+class TestCliConsoleEncoding:
+    """The documented indexing command prints status icons (✓, →, ✗), em
+    dashes and Spanish text. On a Windows run whose output codec cannot
+    represent them (legacy codepage, e.g. on a piped run), the default
+    strict codec raised UnicodeEncodeError AFTER the work was done — the
+    file was embedded and committed, then the run died reporting it. The
+    fix lives at the CLI entry point: printing is the CLI's concern, and
+    the library module stays console-agnostic."""
+
+    def test_entry_point_configures_its_streams(self):
+        rag_index = _load_rag_index_module()
+        out, err = _RecordingStream(), _RecordingStream()
+        rag_index.configure_console_streams(out, err)
+        assert out.reconfigure_kwargs == [{"encoding": "utf-8", "errors": "replace"}]
+        assert err.reconfigure_kwargs == [{"encoding": "utf-8", "errors": "replace"}]
+
+    def test_entry_point_defaults_to_the_real_std_streams(self):
+        rag_index = _load_rag_index_module()
+        # Must run against the real sys.stdout/sys.stderr without raising,
+        # whatever object the interpreter or the test runner substituted.
+        rag_index.configure_console_streams()
+
+    def test_entry_point_tolerates_streams_without_reconfigure(self):
+        rag_index = _load_rag_index_module()
+        rag_index.configure_console_streams(object(), object())  # must not raise
+
+    def test_configured_stream_no_longer_aborts_on_the_historical_payload(self):
+        rag_index = _load_rag_index_module()
+        buffer = io.BytesIO()
+        stream = io.TextIOWrapper(buffer, encoding="cp1252", errors="strict")
+        rag_index.configure_console_streams(stream)
+        # The exact kind of line that crashed the run, accents included.
+        stream.write("  ✓ training/zonas-pulso.md — 6 chunk(s) — Ángulos\n")
+        stream.flush()
+        emitted = buffer.getvalue().decode("utf-8")
+        assert "Ángulos" in emitted  # the Spanish text survives
+        assert "✓" in emitted  # ...and the icon is emitted too, not dropped
